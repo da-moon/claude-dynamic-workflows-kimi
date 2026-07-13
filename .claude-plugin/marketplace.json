@@ -1,0 +1,15 @@
+{
+  "name": "kimi-workflows",
+  "description": "Kimi-backed dynamic workflows for Claude Code: agent fan-outs, sessionful steerable workers, supervised fleets, live run viewers.",
+  "owner": {
+    "name": "da-moon",
+    "url": "https://github.com/da-moon"
+  },
+  "plugins": [
+    {
+      "name": "kimi-workflows",
+      "source": "./",
+      "description": "Run Claude Code dynamic-workflow scripts on Kimi CLI -- Kimi agent fan-outs, sessionful steerable workers, supervised fleets (--multi), live viewers, run analytics."
+    }
+  ]
+}

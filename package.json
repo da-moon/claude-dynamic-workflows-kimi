@@ -26,7 +26,7 @@
     "run-workflow": "node runner/bin/run-workflow.js"
   },
   "keywords": [
-    "kimi", "kimi-code", "kimi-cli", "claude-code", "claude", "agents", "workflow",
+    "kimi", "kimi-cli", "claude-code", "claude", "agents", "workflow",
     "orchestration", "dynamic-workflows", "agent-skills", "visualization", "dag"
   ]
 }

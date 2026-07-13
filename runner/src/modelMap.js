@@ -9,7 +9,7 @@ export function modelId(m) {
 }
 
 // Claude tier -> ordered Kimi preferences (first available wins).
-// Kimi Code CLI exposes models such as kimi-latest, kimi-k2-6, kimi-k2-5, kimi-lite, etc.
+// Kimi CLI exposes models such as kimi-latest, kimi-k2-6, kimi-k2-5, kimi-lite, etc.
 const FAMILY_PREFERENCES = {
   opus: ["kimi-latest", "kimi-k2-6", "kimi-k2-5", "kimi-k2"],
   sonnet: ["kimi-latest", "kimi-k2-5", "kimi-k2-6", "kimi-k2"],
@@ -19,7 +19,6 @@ const FAMILY_PREFERENCES = {
 // Common aliases that may be used in scripts or agent definitions.
 const MODEL_ALIASES = {
   "kimi": "kimi-latest",
-  "kimi-code": "kimi-latest",
   "frontier": "kimi-latest",
 };
 

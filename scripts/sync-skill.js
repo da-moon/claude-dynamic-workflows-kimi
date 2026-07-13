@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// Sync this repo's skill surface to ~/.kimi-code/skills/kimi-workflows in one
+// Sync this repo's skill surface to ~/.claude/skills/kimi-workflows in one
 // command -- the skill lives in two places (the repo is the source of truth;
-// the skills dir is what Kimi Code CLI loads) and they drift when synced by hand.
+// the skills dir is what Claude Code loads) and they drift when synced by hand.
 //
-//   npm run sync-skill            # repo -> ~/.kimi-code/skills/kimi-workflows
+//   npm run sync-skill            # repo -> ~/.claude/skills/kimi-workflows
 //
 // Copies SKILL.md + references/ + examples/ + runner/, excluding OS noise and
 // local run artifacts (but keeping the bundled demo's committed journal). The
@@ -15,7 +15,7 @@ import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), "..");
-const DEST = process.argv[2] || join(homedir(), ".kimi-code", "skills", "kimi-workflows");
+const DEST = process.argv[2] || join(homedir(), ".claude", "skills", "kimi-workflows");
 
 // Local artifacts that must not ship: OS noise, generated viewer pages, and
 // run journals -- EXCEPT the bundled demo's committed journal, which is the

@@ -1,39 +1,39 @@
 ---
 name: kimi-workflows
+disable-model-invocation: true
 description: >-
-  Run a dynamic-workflow script via headless Kimi CLI prompts -- orchestrate many
-  Kimi agents (the agent / parallel / pipeline / phase / budget DSL)
+  From Claude Code, run a dynamic-workflow script via headless Kimi CLI prompts --
+  orchestrate many Kimi agents (the agent / parallel / pipeline / phase / budget DSL)
   for codebase audits, large migrations, and multi-agent review or research.
   Give it one or two rough sentences and it compiles the right harness for you;
   add --multi for a supervised fleet of concurrent workflows.
-  Manual-invoke only via /skill:kimi-workflows.
-disableModelInvocation: true
+  Manual-invoke only via /kimi-workflows.
 ---
 
 # Kimi Workflows
 
-Run a Kimi Code CLI dynamic-workflow script via **headless Kimi CLI prompts**.
-The authoring surface is identical to native dynamic workflows — `export const
+From **Claude Code**, run a dynamic-workflow script via **headless Kimi CLI prompts**.
+The authoring surface is identical to native Claude Code dynamic workflows — `export const
 meta` plus a body using `agent()`, `parallel()`, `pipeline()`, `phase()`,
 `log()`, `args`, `budget`, `workflow()` — but every `agent()` call runs as one
 Kimi (GPT) thread+turn instead of a Claude subagent.
 
-**Manual-invoke only.** Kimi does not auto-trigger this skill
+**Manual-invoke only.** Claude Code does not auto-trigger this skill
 (`disable-model-invocation: true`); it runs only when the user types
-`/skill:kimi-workflows` or explicitly asks for a Kimi workflow. Once invoked, follow
+`/kimi-workflows` or explicitly asks for a Kimi workflow. Once invoked, follow
 the loop below — the work runs on Kimi/GPT agents. If the user actually wanted
-Kimi subagents, say so and point them at the native Workflow tool.
+Claude subagents, say so and point them at the native Workflow tool.
 
 `RUNNER` below means the bundled runner directory: **`runner/` relative to this
 skill's base directory** (shown when the skill loads). For a classic skills-dir
-install that is `~/.claude/skills/skill:kimi-workflows/runner` — the literal paths in
+install that is `~/.claude/skills/kimi-workflows/runner` — the literal paths in
 the examples below assume it; substitute your base directory if this skill is
 installed as a plugin. It is dependency-free Node ≥ 18.
 
 ## Default rough-intent mode
 
 **One or two rough sentences is enough.** You do not need to hand this skill a
-fully-engineered spec — describe what you want (e.g. `/skill:kimi-workflows Harden this
+fully-engineered spec — describe what you want (e.g. `/kimi-workflows Harden this
 goal before I run it`) and the skill compiles it into an operational harness itself:
 it classifies the job, picks the smallest workable scale, an archetype, and a
 harness pattern, builds a task contract, composes phases, casts personas, applies
@@ -76,7 +76,7 @@ Read the mode from the user's phrasing, then behave accordingly:
 |------|---------|----------|
 | **default** (rough-intent) | 1–2 rough sentences | Compile internally → author → run. State assumptions. |
 | **`--multi`** (fleet) | the `--multi` flag, or "fleet" / "several workflows at once" | Compile a **fleet plan** (2–4 concurrent variant workflows, similar and/or diverse), launch them in the background, and **supervise**: poll `fleet status`, answer gates, steer, kill, fork, then synthesize. See *Fleet mode*. |
-| **`prompt-only`** | "prompt-only", "just the invocation", "don't run it" | Emit a complete `/skill:kimi-workflows` invocation/spec (the A–L structure below) and **STOP** — do not author or run. |
+| **`prompt-only`** | "prompt-only", "just the invocation", "don't run it" | Emit a complete `/kimi-workflows` invocation/spec (the A–L structure below) and **STOP** — do not author or run. |
 | **`write-only`** | "write it but don't run", "author only" | Author the workflow script, print its path, stop before running. |
 | **`run-existing`** | a script path or saved-workflow name is given | Skip compilation; run that script/name through the runner. |
 | **`quick`** | "quick", "small", "cheap" | Bias to a `quick_harness` (2–5 agents). |
@@ -102,7 +102,7 @@ are unchanged; steps 2 and 4 are where rough intent gets compiled.
 1. **Preflight** — once per session, or whenever a run fails to connect, confirm
    Kimi is reachable and authed:
    ```bash
-   node ~/.claude/skills/skill:kimi-workflows/runner/test/handshake.js
+   node ~/.claude/skills/kimi-workflows/runner/test/handshake.js
    ```
    It prints `state: ready` and the available models. If it fails, tell the user
    to run `kimi login` (the runner needs a logged-in `kimi` CLI on PATH).
@@ -135,7 +135,7 @@ are unchanged; steps 2 and 4 are where rough intent gets compiled.
    `--effort medium` for a quick harness (see *Effort*). `--frontier` pins every
    agent to the latest frontier model (see *Model*):
    ```bash
-   node ~/.claude/skills/skill:kimi-workflows/runner/bin/run-workflow.js <script.js> --frontier --auto-effort [other flags]
+   node ~/.claude/skills/kimi-workflows/runner/bin/run-workflow.js <script.js> --frontier --auto-effort [other flags]
    #   quick_harness:  … <script.js> --frontier --effort medium [other flags]
    ```
    Progress streams on **stderr**; the workflow's return value prints as JSON on
@@ -148,7 +148,7 @@ are unchanged; steps 2 and 4 are where rough intent gets compiled.
    mention the script path, and **render the run's ASCII map inline in this
    conversation** so they see the execution graph natively (no window to open):
    ```bash
-   node ~/.claude/skills/skill:kimi-workflows/runner/bin/map-run.js --journal <journal> --no-color
+   node ~/.claude/skills/kimi-workflows/runner/bin/map-run.js --journal <journal> --no-color
    ```
    (`<journal>` is the path the run logged as `✎ journal: …`, default
    `.workflow-journal/<name>.jsonl`.) Paste that output into your reply inside a
@@ -237,7 +237,7 @@ Launch each with `run_in_background`, **always with `--interactive`** (it
 enables the answer channel headlessly):
 
 ```bash
-node ~/.claude/skills/skill:kimi-workflows/runner/bin/run-workflow.js hunt-orm.workflow.js \
+node ~/.claude/skills/kimi-workflows/runner/bin/run-workflow.js hunt-orm.workflow.js \
   --frontier --auto-effort --interactive --budget 1500000 1>hunt-orm.result.json
 # same script, different slice → isolate with --run-id:
 node …/run-workflow.js hunt.workflow.js --args '{"slice":"auth"}' --run-id auth --interactive …
@@ -252,7 +252,7 @@ polled (e.g. append `$WORKFLOW_EVENT` to a file you watch, or a macOS
 `osascript` notification):
 
 ```bash
-node ~/.claude/skills/skill:kimi-workflows/runner/bin/fleet.js status <fleet-dir>   # --json to parse
+node ~/.claude/skills/kimi-workflows/runner/bin/fleet.js status <fleet-dir>   # --json to parse
 ```
 
 (When the *user* wants to watch alongside you, add `--watch` for an in-place
@@ -785,14 +785,14 @@ Every completed run leaves a journal at `<project>/.workflow-journal/<name>.json
 To inspect it as a polished GUI, generate a self-contained HTML viewer:
 
 ```bash
-node ~/.claude/skills/skill:kimi-workflows/runner/bin/view-run.js <project-dir> --open
+node ~/.claude/skills/kimi-workflows/runner/bin/view-run.js <project-dir> --open
 ```
 
 For a terminal-native view (no browser), render the run as an **ASCII map** —
 add `--watch` to redraw it live as the run progresses:
 
 ```bash
-node ~/.claude/skills/skill:kimi-workflows/runner/bin/map-run.js <project-dir> [--watch]
+node ~/.claude/skills/kimi-workflows/runner/bin/map-run.js <project-dir> [--watch]
 ```
 
 It auto-finds the journal and the `*.workflow.js` script in that dir (or pass
@@ -836,7 +836,7 @@ run cost, where the time and tokens went, and whether anything looks off — poi
 `summarize-run` at the journal (or run dir):
 
 ```bash
-node ~/.claude/skills/skill:kimi-workflows/runner/bin/summarize-run.js <project-dir>
+node ~/.claude/skills/kimi-workflows/runner/bin/summarize-run.js <project-dir>
 #   --json        structured (the summary object)        --markdown   paste-ready
 #   --out PATH    write to a file                         --include-result  preview the return value
 ```

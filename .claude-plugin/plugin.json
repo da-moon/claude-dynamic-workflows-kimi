@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "kimi-workflows",
+  "displayName": "Kimi Workflows",
+  "description": "Run Claude Code dynamic-workflow scripts on Kimi CLI -- fan out Kimi agents with the agent/parallel/pipeline DSL, supervised fleets (--multi), live viewers, and run analytics.",
+  "author": {
+    "name": "da-moon",
+    "url": "https://github.com/da-moon"
+  },
+  "homepage": "https://github.com/da-moon/claude-dynamic-workflows-kimi#readme",
+  "repository": "https://github.com/da-moon/claude-dynamic-workflows-kimi",
+  "license": "MIT",
+  "keywords": ["kimi", "workflows", "agents", "orchestration", "dynamic-workflows"]
+}

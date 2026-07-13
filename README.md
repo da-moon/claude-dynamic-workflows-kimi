@@ -1,6 +1,8 @@
 # Claude Dynamic Workflows — on Kimi
 
-> A **Kimi Code CLI plugin**: invoke the skill and a fleet of **Kimi agents** fans out across the work — Kimi authors the workflow, runs it via headless `kimi -p` prompts, and streams it back as a live **execution map**.
+> A **Claude Code plugin**: invoke `/kimi-workflows` and a fleet of **Kimi agents**
+> fans out across the work — Claude authors the workflow, runs it via headless
+> `kimi -p` prompts, and streams it back as a live **execution map**.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 ![Node ≥ 18](https://img.shields.io/badge/node-%E2%89%A5%2018-green.svg)
@@ -11,12 +13,12 @@
 
 <sub>↑ a real run: diagnose a checkout latency regression — triage the signals in parallel, **race three root-cause workers** and cancel the losers, steer the winner on its warm transcript, then gate the fix. This is the bundled demo; open it yourself in 10 seconds ([below ↓](#see-it-now-no-kimi-required)).</sub>
 
-You describe a task; Kimi Code CLI writes a [dynamic-workflow](https://code.claude.com/docs/en/workflows) script — `agent()` / `parallel()` / `pipeline()` / `phase()` / `budget` — and runs it across dozens of Kimi agents. The runtime holds the loop, branching, and intermediate results, so your context only sees the final answer — and you watch it build as an interactive map. And unlike the native one-shot DSL, workers here can stay **live** — steer a worker on warm context, race several and cancel the losers, or let a controller adapt the plan as results land ([Beyond one-shot ↓](#beyond-one-shot-sessionful-workers)). It scales one level up, too: add **`--multi`** and Kimi launches a whole **fleet of concurrent workflows and supervises them itself** — answering their gates, steering, killing dead ends, forking winners ([walkthrough 8 ↓](#8--run-a-whole-fleet--and-let-kimi-supervise-it)). Great for codebase audits, large migrations, cross-checked research, and idea generation.
+You describe a task; **Claude Code** writes a [dynamic-workflow](https://code.claude.com/docs/en/workflows) script — `agent()` / `parallel()` / `pipeline()` / `phase()` / `budget` — and runs it across dozens of Kimi agents. The runtime holds the loop, branching, and intermediate results, so your context only sees the final answer — and you watch it build as an interactive map. And unlike the native one-shot DSL, workers here can stay **live** — steer a worker on warm context, race several and cancel the losers, or let a controller adapt the plan as results land ([Beyond one-shot ↓](#beyond-one-shot-sessionful-workers)). It scales one level up, too: add **`--multi`** and Claude launches a whole **fleet of concurrent workflows and supervises them itself** — answering their gates, steering, killing dead ends, forking winners ([walkthrough 8 ↓](#8--run-a-whole-fleet--and-let-claude-supervise-it)). Great for codebase audits, large migrations, cross-checked research, and idea generation.
 
 This repo is **two ways in**:
 
-1. **The `kimi-workflows` skill** — how you use it day to day, from the Kimi Code CLI TUI. **Start here ↓**
-2. **A standalone runner + viewer** — the same engine without the skill (a CLI, [near the end](#without-kimi-code-cli-standalone-cli)).
+1. **The `kimi-workflows` skill** — how you use it day to day, from Claude Code. **Start here ↓**
+2. **A standalone runner + viewer** — the same engine without the skill (a CLI, [near the end](#without-claude-code-standalone-cli)).
 
 > Unofficial / community project. Not affiliated with Moonshot AI or Anthropic.
 > "Kimi", "Claude" and "Claude Code" are trademarks of their respective owners.
@@ -42,34 +44,34 @@ That opens the map above — a fictional **checkout-latency incident**: a parall
 | **Cockpit.** A live run paused at a `human()` gate — answer it right in the page. | **Light theme.** Toggle Dark/Light top-right; there's a dense **Tree** layout too ([below](#the-run-viewer)). |
 | ![cockpit](docs/cockpit.png) | ![light](docs/map-light.png) |
 
-The first thing you'll notice is what's *not* in the old one-shot model: **long-lived workers** (`⟳ 2 turns`), a **race** that cancelled its losers, and — live — an **answer card** the run is waiting on. The rest of this guide is how to *drive* all of that from Kimi Code CLI.
+The first thing you'll notice is what's *not* in the old one-shot model: **long-lived workers** (`⟳ 2 turns`), a **race** that cancelled its losers, and — live — an **answer card** the run is waiting on. The rest of this guide is how to *drive* all of that from Claude Code.
 
 ---
 
 ## Install
 
-**As a Kimi Code CLI plugin** (recommended — updates with every push):
+**As a Claude Code plugin** (recommended — updates with every push):
 
 ```text
-/plugins install https://github.com/da-moon/claude-dynamic-workflows-kimi
+/plugin add https://github.com/da-moon/claude-dynamic-workflows-kimi
 ```
 
 **Or as a classic skills-dir clone:**
 
 ```bash
-git clone https://github.com/da-moon/claude-dynamic-workflows-kimi ~/.kimi-code/skills/kimi-workflows
+git clone https://github.com/da-moon/claude-dynamic-workflows-kimi ~/.claude/skills/kimi-workflows
 ```
 
 (Developing from a clone elsewhere? `npm run sync-skill` pushes the skill
 surface — `SKILL.md`, `references/`, `examples/`, `runner/` — to
-`~/.kimi-code/skills/kimi-workflows` in one command.)
+`~/.claude/skills/kimi-workflows` in one command.)
 
 **Prerequisites**
 
 - [Node](https://nodejs.org) ≥ 18 (zero npm dependencies to install)
 - The [`kimi`](https://code.kimi.com) CLI on your `PATH`, logged in: `kimi login`
 
-Either way the skill is now available in Kimi Code CLI.
+Either way the plugin is now available in Claude Code.
 Verify Kimi is reachable any time with:
 
 ```bash
@@ -81,12 +83,12 @@ anything: `run`, `fleet status|answer`, `view`, `map`, `summarize`.)
 
 ---
 
-## Using it in Kimi Code CLI
+## Using it in Claude Code
 
 The skill is **manual-invoke only** — the model never auto-triggers it. Load the skill and describe the task in **one or two rough sentences** — there's no need to pre-engineer a prompt; the skill compiles your rough intent into the right workflow itself:
 
 ```text
-/skill:kimi-workflows  Audit every route under src/ for missing auth checks
+/kimi-workflows  Audit every route under src/ for missing auth checks
 ```
 
 Behind that one line, Kimi:
@@ -149,37 +151,37 @@ One thing you *don't* tune: it's always **one frontier model for every agent** �
 
 ```
 # Audit — scan in parallel, then a skeptic confirms each finding
-/skill:kimi-workflows  Audit every route under src/ for missing authorization, read-only
+/kimi-workflows  Audit every route under src/ for missing authorization, read-only
 
 # Research — fan out across the web, cross-check every claim, cite the survivors
-/skill:kimi-workflows  Research the current state of on-device LLM inference and verify each claim, then watch it live
+/kimi-workflows  Research the current state of on-device LLM inference and verify each claim, then watch it live
 
 # Brainstorm — generate, dedup, judge, recommend (plan it first to see the cost)
-/skill:kimi-workflows  Brainstorm 10 product ideas from this repo, score them with 3 judges, recommend the top 3 — plan it first
+/kimi-workflows  Brainstorm 10 product ideas from this repo, score them with 3 judges, recommend the top 3 — plan it first
 
 # Review — producer drafts, independent reviewers sign off (no agent reviews its own work)
-/skill:kimi-workflows  Review the files I changed for bugs with a fresh-context review gate
+/kimi-workflows  Review the files I changed for bugs with a fresh-context review gate
 
 # Triage — classify a batch in parallel, dedupe, route (untrusted text stays read-only)
-/skill:kimi-workflows  Triage these 40 issues and route each to a team
+/kimi-workflows  Triage these 40 issues and route each to a team
 
 # Migrate — find every call site and rewrite it (needs write access)
-/skill:kimi-workflows  Find every call of legacyFetch() and migrate it to the new client, then apply the edits
+/kimi-workflows  Find every call of legacyFetch() and migrate it to the new client, then apply the edits
 
 # Harden a goal — lint a vague /goal into a precise, testable one before you spend a fleet (goal_lint)
-/skill:kimi-workflows  Harden this Codex goal before I run it
+/kimi-workflows  Harden this Codex goal before I run it
 
 # Claim-check — verify a draft's claims against the actual repo, refute the unsupported ones (claim_check)
-/skill:kimi-workflows  Verify this blog draft against the repo
+/kimi-workflows  Verify this blog draft against the repo
 
 # Invent — net-new-to-industry product ideas, not thin wrappers; judged and recombined (industry_invention_studio)
-/skill:kimi-workflows  Generate practically useful, net-new product ideas from this repo
+/kimi-workflows  Generate practically useful, net-new product ideas from this repo
 
 # Triage a result — decide real / overfit / continue, then write the next experiment's /goal (research_result_triage)
-/skill:kimi-workflows  Triage the latest research result and write the next /goal
+/kimi-workflows  Triage the latest research result and write the next /goal
 
 # Fleet — several concurrent workflows, supervised by Claude (answers gates, steers, kills, forks)
-/skill:kimi-workflows --multi  Find the cause of the checkout p99 regression — attack it from a few different angles at once
+/kimi-workflows --multi  Find the cause of the checkout p99 regression — attack it from a few different angles at once
 ```
 
 Rough intent is the default — a sentence or two is enough, and the skill compiles the rest (scale, archetype, pattern, task contract, safe run settings). Add `prompt-only` if you just want the generated invocation without running it.
@@ -199,53 +201,53 @@ Rough intent is the default — a sentence or two is enough, and the skill compi
 
 ## Real-world walkthroughs
 
-Each of these is **one rough sentence** to `/skill:kimi-workflows`. Claude compiles it into the harness described, runs it on Kimi, and hands you the artifact — you watch it build the whole time. These are the shapes people actually reach for.
+Each of these is **one rough sentence** to `/kimi-workflows`. Claude compiles it into the harness described, runs it on Kimi, and hands you the artifact — you watch it build the whole time. These are the shapes people actually reach for.
 
 ### 1 · Diagnose a production incident (the bundled demo)
 
-> `/skill:kimi-workflows  Checkout p99 just spiked 12×. Triage the signals, race a few root-cause theories, confirm the leading one, and propose a fix — read-only, and ask me before you suggest shipping anything.`
+> `/kimi-workflows  Checkout p99 just spiked 12×. Triage the signals, race a few root-cause theories, confirm the leading one, and propose a fix — read-only, and ask me before you suggest shipping anything.`
 
 Claude authors a **root-cause lab**: a parallel **Triage** (metrics · logs · recent deploys), then a **Hunt** that *races three live workers* — one per hypothesis (N+1 query, pool exhaustion, cache stampede). The first to land wins; the runtime **cancels the other two** (you don't pay for the slowest). The winning worker is then **steered on its warm thread** — "confirm on the held repro" — a cheap second turn that doesn't re-read anything (141k tokens for the hunt → 47k for the confirmation). It **pauses at a `human()` gate** for the ship decision, then a lone `xhigh` synthesizer writes the patch + a regression test. The whole run is the hero image above; click the **n+1** worker for the per-turn timeline, and the live run shows the **answer card** (the cockpit screenshot). Bundled — open it with `node runner/bin/view-run.js examples/incident-demo --open`.
 
 ### 2 · Audit a codebase for a class of bug — and trust the result
 
-> `/skill:kimi-workflows  Audit every route under src/ for missing authorization, read-only. Have an independent skeptic try to refute each finding before you report it.`
+> `/kimi-workflows  Audit every route under src/ for missing authorization, read-only. Have an independent skeptic try to refute each finding before you report it.`
 
 The classic **find → adversarially-verify** shape, and the reason to use a fleet instead of one agent: one pass *finds* candidates in parallel (one agent per area), then a **second, independent agent tries to refute each** — defaulting to "not a real finding" unless it can prove exploitability with a `file:line`. Plausible-but-wrong findings die in verification instead of in your inbox. You get a deduped table of *confirmed* issues with evidence, and (because it's `--sandbox read-only`) nothing was ever written. Swap "authorization" for "missing input validation", "unhandled promise rejections", "N+1 queries", "PII in logs" — same harness.
 
 ### 3 · Load a big thing once, then interrogate it cheaply
 
-> `/skill:kimi-workflows  Read everything under packages/core into one worker, then I'm going to ask it a stream of questions — keep it warm.`
+> `/kimi-workflows  Read everything under packages/core into one worker, then I'm going to ask it a stream of questions — keep it warm.`
 
 This is the **sessionful** superpower the native one-shot DSL can't do. One worker ingests the corpus **once** (`agent.start`); every follow-up is a `session.steer` on the *same warm thread* — it answers from context instead of re-reading. Measured on this repo's own source: after the one-time load, follow-ups cost **~69k tokens in ~6s each** versus **~219k and ~97s** for a cold agent re-reading every time — **~3× cheaper, ~16× faster per question** ([benchmark](examples/benchmarks)). Works for a data room, a contract set, a spec bundle, a log archive — anything you'll question more than twice.
 
 ### 4 · Throw several strategies at one stubborn bug
 
-> `/skill:kimi-workflows  This flaky test fails ~1 in 20. Try three theories at once — a recent regression, a timing/ordering race, and a shared-state leak — and tell me whichever one cracks it first.`
+> `/kimi-workflows  This flaky test fails ~1 in 20. Try three theories at once — a recent regression, a timing/ordering race, and a shared-state leak — and tell me whichever one cracks it first.`
 
 A **hedged race**: three workers attack the same problem from different angles in parallel; `agent.waitAny` wakes you on the **first** to reach a conclusion, and the losers are **cancelled** on the spot. You stop paying for the two dead ends the moment the live one pays off — the opposite of a `parallel()` barrier that waits for (and bills) the slowest. Reach for it whenever the *cheapest path to an answer is unknown* and trying several beats committing to one.
 
 ### 5 · Let it do the work — but stop at the decisions only you should make
 
-> `/skill:kimi-workflows  Migrate every call of legacyFetch() to the new client and apply the edits — but show me the plan and check with me before you touch anything in payments/.`
+> `/kimi-workflows  Migrate every call of legacyFetch() to the new client and apply the edits — but show me the plan and check with me before you touch anything in payments/.`
 
 The **cockpit**. Claude authors a migration that discovers every call site, drafts the rewrites, and at the risky fork calls `human("apply to payments/ now, or open a PR?", {choices})`. With `--gui`, the run **pauses and an answer card appears right in the live viewer** (the cockpit screenshot) — the whole fleet stays *warm* while it waits for your click. Unattended (CI, overnight) it falls back to the safe default after a timeout instead of hanging, and your answer is journaled so a `--resume` never re-asks. Supervised autonomy: the agents do the labor, you keep the judgment calls.
 
 ### 6 · The trust loop — harden the instruction before, verify the claims after
 
-> Before: `/skill:kimi-workflows quick Harden this Kimi /goal before I run it: [paste]`  ·  After: `/skill:kimi-workflows Verify this PR description's claims against the actual diff and repo.`
+> Before: `/kimi-workflows quick Harden this Kimi /goal before I run it: [paste]`  ·  After: `/kimi-workflows Verify this PR description's claims against the actual diff and repo.`
 
 Two shipped harness-zoo templates that bracket any expensive run. **GoalLint** turns a vague, risky `/goal` into a precise, **falsifiable**, artifact-producing one — so you stop getting runs that end in "looks good" with no controls and no stopping criteria. **ClaimCheck** extracts every factual claim in a doc (README, PR, report, agent output), verifies each against repo artifacts, marks them *supported / unsupported / contradicted / plausible-unverified*, and emits a **proof ledger** with safer rewrites for the ones that don't hold. *Harden before agents run; verify the claims after they write.*
 
 ### 7 · Cross-checked research with source discipline
 
-> `/skill:kimi-workflows  Research the current state of on-device LLM inference, verify every claim against a source, and cite the survivors — watch it live.`
+> `/kimi-workflows  Research the current state of on-device LLM inference, verify every claim against a source, and cite the survivors — watch it live.`
 
 A research fan-out that's honest about what it knows: parallel searches gather candidate claims, an independent pass **verifies each against a real source** (and *reports gaps rather than fabricating* when the evidence isn't there), and a synthesizer writes the cited brief. Confirmed evidence, inference, and uncertainty stay separated — missing evidence is treated as uncertainty, not success.
 
 ### 8 · Run a whole fleet — and let Claude supervise it
 
-> `/skill:kimi-workflows --multi  Find the cause of the checkout p99 regression — attack it from a few different angles at once, and keep the total under 5M tokens.`
+> `/kimi-workflows --multi  Find the cause of the checkout p99 regression — attack it from a few different angles at once, and keep the total under 5M tokens.`
 
 With `--multi`, Claude stops being a launcher and becomes the **operator**. It compiles a *fleet plan* — say, a sessionful deep-dive on the ORM theory, a loop-until-dry sweep of recent diffs, and a log-forensics fan-out — and launches each as its own background run in one shared directory, budget split across them. Then it runs the supervision loop the runner was built for: `fleet status` rolls every run into one digest (who's running, who's **stalled**, who's **waiting on an answer**, who finished and what they returned), gates **push** instead of waiting to be polled (`--notify-cmd` fires a shell hook the moment a question goes pending or a run ends), and the workflows are authored with **supervisor checkpoints** — `human()` gates whose answers Claude itself supplies via `fleet answer`, with free text acting as a *steer* ("drop the cache theory, go deep on the ORM layer"). A run chasing a dead end gets killed and its tokens stop; a run onto something big gets **forked** — copy the journal, extend the variant, `--resume` replays everything already done at **0 tokens** and sessionful workers re-attach to their threads warm. At the end Claude reconciles the variants' results — including what the killed runs ruled out — into one answer with per-variant costs.
 
@@ -292,14 +294,14 @@ Prefer the terminal? The same run renders as the **ASCII map** shown above — t
 
 ## Putting it to work
 
-`/skill:kimi-workflows` is most useful as an **operating layer around your agents** — reach for it *before* expensive work, *after* messy results, and whenever you want a **repeatable process** instead of a one-off answer. Today **GoalLint** and **`summarize-run`** are concrete and shipped; the other archetypes (triage, eureka, repo-deep-read, root-cause, rule-mining, …) are **shapes the skill authors on demand** — promote the ones that earn their keep into `examples/harness-zoo/` (see the last pattern below).
+`/kimi-workflows` is most useful as an **operating layer around your agents** — reach for it *before* expensive work, *after* messy results, and whenever you want a **repeatable process** instead of a one-off answer. Today **GoalLint** and **`summarize-run`** are concrete and shipped; the other archetypes (triage, eureka, repo-deep-read, root-cause, rule-mining, …) are **shapes the skill authors on demand** — promote the ones that earn their keep into `examples/harness-zoo/` (see the last pattern below).
 
 ### Harden the goal before an expensive run
 
 Make this the default reflex. Before handing a serious `/goal` to Kimi — especially anything touching research claims, benchmarks, repo edits, evals, or "is this result real?":
 
 ```text
-/skill:kimi-workflows quick Harden this Codex goal before I run it:
+/kimi-workflows quick Harden this Codex goal before I run it:
 [paste your /goal]
 ```
 
@@ -322,10 +324,10 @@ For experiment-driven work, run a cadence instead of one-off prompts:
 
 ```text
 # after a result lands — decide what it means and what's next
-/skill:kimi-workflows Triage the latest result in this repo. Decide whether it's real, overfit, useful, or worth continuing, then write the next strict Kimi /goal.
+/kimi-workflows Triage the latest result in this repo. Decide whether it's real, overfit, useful, or worth continuing, then write the next strict Kimi /goal.
 
 # when you're stuck or a result is ambiguous — generate testable directions
-/skill:kimi-workflows deep Generate surprising but practically testable next research ideas from the latest reports and logs. Emphasize hidden mechanisms, falsification, and hard-to-fake success criteria.
+/kimi-workflows deep Generate surprising but practically testable next research ideas from the latest reports and logs. Emphasize hidden mechanisms, falsification, and hard-to-fake success criteria.
 ```
 
 Then GoalLint the chosen `/goal`, run it on Kimi, and `summarize-run` the result — and repeat.
@@ -335,9 +337,9 @@ Then GoalLint the chosen `/goal`, run it on Kimi, and `summarize-run` the result
 This isn't only for giant fan-outs. A `quick_harness` is **2–5 agents** for goal hardening, assumption checks, small critiques, quick ranking, or a single claim check — cheap enough for everyday use:
 
 ```text
-/skill:kimi-workflows quick Critique this plan before I send it to Kimi — ambiguity, falsification, and overbuild critics only.
-/skill:kimi-workflows quick Rank these 6 ideas by novelty, practical usefulness, and fastest proof-of-value — pairwise, not 1–10.
-/skill:kimi-workflows quick Check whether this README claim is actually supported by the current repo.
+/kimi-workflows quick Critique this plan before I send it to Kimi — ambiguity, falsification, and overbuild critics only.
+/kimi-workflows quick Rank these 6 ideas by novelty, practical usefulness, and fastest proof-of-value — pairwise, not 1–10.
+/kimi-workflows quick Check whether this README claim is actually supported by the current repo.
 ```
 
 ### Ask what harness a task deserves
@@ -345,7 +347,7 @@ This isn't only for giant fan-outs. A `quick_harness` is **2–5 agents** for go
 When you're unsure whether a task wants goal-hardening, claim verification, loop-until-dry, tournament ranking, a root-cause lab, or bounded execution, let the skill **design the harness** without running it:
 
 ```text
-/skill:kimi-workflows prompt-only Design the best Kimi-backed harness for: [rough task]. Choose the scale, archetype, pattern, failure mode, task contract, phases, personas, run settings, and output artifacts. Don't run it.
+/kimi-workflows prompt-only Design the best Kimi-backed harness for: [rough task]. Choose the scale, archetype, pattern, failure mode, task contract, phases, personas, run settings, and output artifacts. Don't run it.
 ```
 
 ### Diagnose failures with a root-cause lab
@@ -353,7 +355,7 @@ When you're unsure whether a task wants goal-hardening, claim verification, loop
 When CI, a run, a benchmark, or a Kimi task fails, don't ask one agent to "fix the bug" — that invites a confident wrong diagnosis:
 
 ```text
-/skill:kimi-workflows Diagnose the latest failed run. Use a root-cause lab: separate agents for logs, recent diffs, code-path tracing, environment/resource issues, hypothesis generation, hypothesis refutation, and a minimal repro. Return ranked causes and the cheapest discriminating next test.
+/kimi-workflows Diagnose the latest failed run. Use a root-cause lab: separate agents for logs, recent diffs, code-path tracing, environment/resource issues, hypothesis generation, hypothesis refutation, and a minimal repro. Return ranked causes and the cheapest discriminating next test.
 ```
 
 ### Turn recurring failures into durable rules
@@ -361,7 +363,7 @@ When CI, a run, a benchmark, or a Kimi task fails, don't ask one agent to "fix t
 Periodically mine your own traces so the system gets better as you use it:
 
 ```text
-/skill:kimi-workflows Mine recent reports, journals, failed agent outputs, and my corrections for recurring failure modes. Propose durable rules for CLAUDE.md / AGENTS.md / harness templates — keep only rules that would have prevented a real failure without over-constraining future work.
+/kimi-workflows Mine recent reports, journals, failed agent outputs, and my corrections for recurring failure modes. Propose durable rules for CLAUDE.md / AGENTS.md / harness templates — keep only rules that would have prevented a real failure without over-constraining future work.
 ```
 
 ### Structured synthesis with source discipline
@@ -369,7 +371,7 @@ Periodically mine your own traces so the system gets better as you use it:
 The tool isn't only for code. For a memo, brief, or grant concept, the `policy_or_grant_builder` archetype runs an evidence scan, an opposition critique, claim verification, and a concision pass:
 
 ```text
-/skill:kimi-workflows Draft a one-page memo from the files in this folder — evidence scan, opposition critique, claim verification, then a ruthless concision edit.
+/kimi-workflows Draft a one-page memo from the files in this folder — evidence scan, opposition critique, claim verification, then a ruthless concision edit.
 ```
 
 When a task needs current facts the repo doesn't contain, tell it to **report source gaps rather than fabricate** — the skill's epistemic standards already separate confirmed evidence from inference and treat missing evidence as uncertainty, not success.
@@ -379,7 +381,7 @@ When a task needs current facts the repo doesn't contain, tell it to **report so
 GoalLint is the **before** tool. Its natural **after** counterpart is **ClaimCheck** — extract the claims in a README, post, report, or agent output, verify each against repo artifacts, and emit a proof ledger. The skill can author it as a reusable template:
 
 ```text
-/skill:kimi-workflows Create a reusable harness-zoo workflow `claim-check.workflow.js`: extract claims from a doc or agent output, verify each against repo artifacts, mark them supported / unsupported / contradicted / plausible-unverified, suggest safer rewrites, and emit a proof ledger. Include a README, sample args, and a plan-mode smoke test.
+/kimi-workflows Create a reusable harness-zoo workflow `claim-check.workflow.js`: extract claims from a doc or agent output, verify each against repo artifacts, mark them supported / unsupported / contradicted / plausible-unverified, suggest safer rewrites, and emit a proof ledger. Include a README, sample args, and a plan-mode smoke test.
 ```
 
 > **Harden the instruction before agents run; verify the claims after they write.** Together that's a trust loop.
@@ -398,11 +400,11 @@ GoalLint already proves the model (workflow + README + sample args + strict sche
 ### A weekly cadence
 
 ```text
-Before each expensive run   →  /skill:kimi-workflows quick Harden this /goal before I run it.
-After each result           →  /skill:kimi-workflows Triage the latest result and write the next /goal.
+Before each expensive run   →  /kimi-workflows quick Harden this /goal before I run it.
+After each result           →  /kimi-workflows Triage the latest result and write the next /goal.
 After each run              →  summarize-run the journal; fix the harness if it's costly or messy.
-Weekly                      →  /skill:kimi-workflows Generate net-new practical ideas from this repo and recent run summaries.
-Monthly                     →  /skill:kimi-workflows Mine recurring agent failures into durable rules.
+Weekly                      →  /kimi-workflows Generate net-new practical ideas from this repo and recent run summaries.
+Monthly                     →  /kimi-workflows Mine recurring agent failures into durable rules.
 ```
 
 ---
@@ -448,9 +450,9 @@ for (const s of first.pendingSessions) await s.cancel();           // stop the l
 
 ---
 
-## Without Kimi Code CLI (standalone CLI)
+## Without Claude Code (standalone CLI)
 
-The runner and viewer work on their own — no Kimi Code CLI required.
+The runner and viewer work on their own — no Claude Code required.
 
 ```bash
 # Run a workflow script against Kimi (pin the frontier model, auto-scale effort):
@@ -537,7 +539,7 @@ Sessionful workers — `agent.start` / `agent.waitAny` / `session.steer` — run
 
 ## How it works
 
-Kimi Code CLI's workflow runtime is sealed inside its binary, so this is an **external re-host** of the DSL. The only provider-specific piece is `agent()`:
+Claude Code's workflow runtime is sealed inside its binary, so this is an **external re-host** of the DSL. The only provider-specific piece is `agent()`:
 
 | Workflow concept | Kimi mapping |
 | :--- | :--- |
@@ -586,7 +588,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Repository layout
 
 ```
-SKILL.md                  the Kimi Code CLI skill (manual-invoke /skill:kimi-workflows)
+SKILL.md                  the Claude Code skill (manual-invoke /kimi-workflows)
 runner/                   standalone runner (Node, zero deps)
   bin/run-workflow.js     execute a workflow script on Kimi
   bin/view-run.js         generate the HTML run viewer (--watch for live)

@@ -4,8 +4,9 @@ Thanks for your interest! This is a small, dependency-free project -- easy to ha
 
 ## Layout
 
-- `SKILL.md` -- the Kimi Code CLI skill definition (what Kimi reads when the skill loads).
-- `kimi.plugin.json` -- plugin manifest for Kimi Code CLI.
+- `SKILL.md` -- the Claude Code skill definition (what Claude reads when the skill loads).
+- `.claude-plugin/plugin.json` -- Claude Code plugin manifest.
+- `.claude-plugin/marketplace.json` -- Claude Code marketplace bundle manifest.
 - `runner/` -- the standalone runner (Node, zero deps):
   - `src/` -- the seam (`kimiAgent.js` + `kimiSession.js` for sessionful workers) + provider-neutral DSL (`runtime.js`), and helpers (model mapping, agentTypes, journal, worktree, meter).
   - `bin/run-workflow.js` -- CLI to execute a workflow script.
@@ -16,7 +17,7 @@ Thanks for your interest! This is a small, dependency-free project -- easy to ha
 - `references/` -- `authoring.md` (workflow-script DSL), `runner-readme.md` (architecture / Kimi prompt mapping / faithfulness), `fleet-protocol.md` (the sidecar contract that makes runs supervisable -- implement it to add a new producer/consumer).
 - `examples/` -- runnable templates and a bundled `demo/` run.
 - `bin/kimi-workflows.js` -- the npx/git-install dispatcher (`run` / `fleet` / `view` / `map` / `summarize` / `doctor`).
-- `scripts/sync-skill.js` -- one-command sync of the skill surface to `~/.kimi-code/skills/kimi-workflows` (`npm run sync-skill`).
+- `scripts/sync-skill.js` -- one-command sync of the skill surface to `~/.claude/skills/kimi-workflows` (`npm run sync-skill`).
 
 ## Develop
 
@@ -26,7 +27,7 @@ No build step. Requires Node \u2265 18.
 npm test            # offline unit checks + viewer robustness (no Kimi, no network)
 npm run doctor      # check that Kimi CLI is reachable and logged in
 npm run demo        # open the bundled sample run in the viewer
-npm run sync-skill  # push your working tree to ~/.kimi-code/skills/kimi-workflows
+npm run sync-skill  # push your working tree to ~/.claude/skills/kimi-workflows
 ```
 
 If you touch `runner/bin/view-run.js`, run `npm test` -- `view-run.test.js` renders
