@@ -1,6 +1,6 @@
-# Authoring Codex workflow scripts
+# Authoring Kimi workflow scripts
 
-> You usually don't hand-author these: `/codex-workflows <one or two rough
+> You usually don't hand-author these: `/kimi-workflows <one or two rough
 > sentences>` compiles a workflow script for you (see `SKILL.md` → *Compiling rough
 > intent into a workflow*). This reference is for understanding, tweaking, or
 > writing one by hand.
@@ -53,22 +53,26 @@ export const meta = {
 ## Globals
 
 ### `agent(prompt, opts?) → Promise<string | object | null>`
-The only global that calls a model. Runs `prompt` as one Codex thread+turn.
-- Without `schema`: resolves to the agent's final message text (string).
-- With `schema`: the turn is constrained by Codex `outputSchema`; resolves to the
-  parsed object.
+The only global that calls a model. Runs `prompt` as one headless Kimi CLI turn —
+a fresh `kimi -p <prompt> --output-format stream-json` subprocess per call.
+- Without `schema`: resolves to the agent's final message text (the last
+  stream-json assistant line; tool-call lines are ignored).
+- With `schema`: the schema is **embedded in the prompt** as an instruction (it
+  is not an API-level constraint); the reply is parsed — strict `JSON.parse`,
+  then a tolerant fenced/embedded-JSON fallback. If the model ignores the schema
+  anyway, the call resolves `null` (not an error) — `.filter(Boolean)` before use.
 - Resolves `null` if the turn was interrupted. Throws on a hard failure (so
   `parallel`/`pipeline` turn it into `null`).
 
 `opts`:
 | opt | meaning |
 | --- | --- |
-| `schema` | JSON Schema (object root, `additionalProperties:false` recommended) → Codex `outputSchema`; result is `JSON.parse`d |
-| `model` | **Leave unset in scripts.** Runs are pinned to one latest-frontier model with `--frontier`, which overrides any per-call `model` anyway. (If you do set it, Claude ids/aliases map Opus → Sol, Sonnet → Terra, and Haiku → Luna when available.) |
+| `schema` | JSON Schema (object root). Strict-normalized by the runner (every property `required`, `additionalProperties:false` — recursively) and **embedded in the prompt**; the reply is parsed leniently (`JSON.parse`, then a fenced/embedded-JSON fallback) and degrades to `null` if the model doesn't comply |
+| `model` | **Leave unset in scripts.** Runs are pinned to the strongest *configured* model with `--frontier`, which overrides any per-call `model` anyway. (If you do set it: usable ids are the ones configured in kimi — `kimi provider list --json`, e.g. `kimi-code/kimi-for-coding` — and Claude ids/aliases map `opus`/`sonnet` → `kimi-for-coding`, `haiku` → `kimi-for-coding-highspeed`; an unconfigured id falls back to kimi's own config default with a warning.) |
 | `agentType` | name of a subagent in `.claude/agents/<name>.md`; its body becomes the system prompt, its frontmatter `model` a fallback |
 | `systemPrompt` | explicit developer instructions (overrides `agentType` body) |
-| `effort` | `none`/`minimal`/`low`/`medium`/`high`/`xhigh`. **Usually leave unset and run with `--auto-effort`**, which scales effort to each layer's parallel width (1→`xhigh`, 2+→`high` — the floor) so lone gate agents get the policy's extra-high tier while every fan-out still gets `high`. A per-call `effort` *overrides* the policy, so set it only as a deliberate exception. Precedence: `--pin-effort` > per-call `effort` > `--auto-effort` > `--effort` > inherited user config or model default. With no explicit `model_reasoning_effort`, GPT-5.6 Sol's catalog default is `low`; unspecified effort is not universally `xhigh`. |
-| `sandbox` | `read-only` \| `workspace-write` \| `danger-full-access` (default `workspace-write`) |
+| `effort` | `none`/`minimal`/`low`/`medium`/`high`/`xhigh`. **Usually leave unset and run with `--auto-effort`**, which scales effort to each layer's parallel width (1→`xhigh`, 2+→`high` — the floor) so lone gate agents get the policy's extra-high tier while every fan-out still gets `high`. A per-call `effort` *overrides* the policy, so set it only as a deliberate exception. Precedence: `--pin-effort` > per-call `effort` > `--auto-effort` > `--effort` > unset (no effort hint at all). Effort reaches Kimi as a **prompt hint** (`(thinking effort: X)` prepended to the turn), not an API parameter — a strong steer, not a hard guarantee. |
+| `sandbox` | `read-only` \| `workspace-write` \| `danger-full-access` — **advisory metadata only, never enforced.** Headless `kimi -p` runs are full-auto: every tool action, writes included, is auto-approved (that unrestricted mode is the supported default for workflow runs). The value is journaled (cache identity) and reported in summaries; `read-only` does **not** prevent writes — use prompt instructions and `isolation:'worktree'` to contain write-capable agents |
 | `isolation` | `'worktree'` → run in a detached git worktree at HEAD (parallel file-editing agents don't collide); kept if it leaves changes |
 | `cwd` | working directory for the thread (default the runner's cwd) |
 | `personality` | `none` \| `friendly` \| `pragmatic` |
@@ -106,22 +110,33 @@ saved workflow (file lists, a research question, config).
 `spent()` is tokens used so far; `remaining()` is `Infinity` with no budget. Once
 spent reaches total, further `agent()` calls throw. Use for dynamic depth:
 `while (budget.total && budget.remaining() > 50_000) { … }`.
+Token numbers on the Kimi backend are **estimates** (~4 chars/token over each
+turn's prompt + final text — the headless CLI reports no usage, and an agent's
+own tool traffic isn't visible), so treat `--budget` as a coarse backstop and
+size runs with `--plan` first.
 
 ### `workflow(ref, args?) → Promise<any>`
-Run another script inline (one level only). `ref` is `{ scriptPath }`. Shares the
-concurrency cap and budget.
+Run another script inline (one level only). `ref` is `{ scriptPath }`, a plain
+path string, a saved-workflow **name** (resolved from `.claude/workflows/` then
+`~/.claude/workflows/`, matching `<name>.js` / `<name>.workflow.js` /
+`<name>.mjs`), or `{ name }`. Shares the concurrency cap and budget.
 
 ## Sessionful workers (long-lived, steerable)
 
-`agent()` is one-shot: one Codex thread, one turn, done. A **session** keeps the
-thread open so you can run *follow-up turns on the same thread* — the worker keeps
-its context. This is the seam for orchestration loops: spawn several workers, wait
-for whichever is useful first, then **accept / steer / spawn / verify / stop**.
+`agent()` is one-shot: one `kimi -p` subprocess, one turn, done. A **session**
+rides Kimi's *persisted sessions*: every `kimi -p` run ends with a
+`session.resume_hint` meta line carrying a stable `session_<uuid>` id; the runner
+captures it on the worker's first turn and runs every follow-up as
+`kimi -S <id> -p <new prompt>` — only the new prompt is sent, and the context
+(prior turns, tool calls included) lives in kimi's session store, so per-turn
+input does not grow with the conversation. This is the seam for orchestration
+loops: spawn several workers, wait for whichever is useful first, then
+**accept / steer / spawn / verify / stop**.
 
 The sessionful API hangs off `agent` (not new globals):
 
 ### `agent.start(prompt, opts?) → Promise<AgentSession>`
-Starts a thread and begins the first turn, then returns a handle **without waiting
+Starts a session and begins the first turn, then returns a handle **without waiting
 for the turn to finish**. Same `opts` as `agent()` (`agentType`, `systemPrompt`,
 `model`, `effort`, `sandbox`, `cwd`, `personality`, `schema`, `timeoutMs`, `phase`,
 `label`, `isolation:'worktree'`). Effort resolves exactly like `agent()` (so under
@@ -142,8 +157,8 @@ me when any child worker finishes or needs attention."
 | `id` `label` `phase` `threadId` `currentTurnId` `status` | identity + live state (`status`: `starting`→`running`→`completed`/`interrupted`/`failed`/`cancelled`/`closed`) |
 | `wait(opts?) → Promise<snapshot>` | await the current turn. `opts.timeoutMs` returns a `timed_out` snapshot **without cancelling** the turn (it keeps running) |
 | `poll() → snapshot` | latest snapshot, synchronously (no waiting) |
-| `steer(message, opts?) → Promise<snapshot>` | **a follow-up `turn/start` on the SAME thread** — the worker continues with its context. Per-turn overrides: `schema`, `effort`, `timeoutMs`, `label`. Thread-level settings (`cwd`, `sandbox`, instructions) are fixed at start and can't change. `{wait:false}` returns the running snapshot; default `{wait:true}` awaits it. Throws if a turn is already running (`wait()`/`cancel()` first) or the session is closed |
-| `cancel() → Promise<snapshot>` | interrupt the active turn (`turn/interrupt`); returns a `cancelled` snapshot |
+| `steer(message, opts?) → Promise<snapshot>` | **a follow-up turn on the SAME persisted kimi session** (`kimi -S <id> -p`, only the new prompt is sent) — the worker continues with its full context. Per-turn overrides: `schema`, `effort`, `timeoutMs`. Session-level settings (`cwd`, instructions, `label`) are fixed at start and can't change. `{wait:false}` returns the running snapshot; default `{wait:true}` awaits it. Throws if a turn is already running (`wait()`/`cancel()` first) or the session is closed |
+| `cancel() → Promise<snapshot>` | interrupt the active turn **for real**: the turn's kill handle SIGTERMs the live `kimi` subprocess, the turn settles as interrupted (never retried, excluded from the session context) and the snapshot status is `cancelled` — a cancelled loser stops paying wall-clock and tokens |
 | `close() → Promise<void>` | cancel any active turn, remove the worktree (if `isolation`), mark closed |
 
 `AgentSessionSnapshot`: `{ id, label, phase, threadId, turnId, status, result,
@@ -263,19 +278,24 @@ prints the workflow's return value, so the human sees the question and resume hi
 ### Limits & resume (read this)
 
 - **Warm-context resume.** `agent()` stays resumable as before. Sessions resume
-  **warm**: each turn is journaled under `sess:<workerId>#<turn>` with the worker's
-  Codex `threadId`; on `--resume` the runtime calls `thread/resume` to re-attach the
-  **persisted thread** (the server reloads its rollout from disk), replays the
-  journaled *completed-turn prefix* free (0 tokens, `cached` events), and runs only
-  the new turns — on the worker's full prior context. Two honesty rules: replay is
-  **conditional on a successful re-attach** (a fresh thread never saw those prompts,
-  so if the rollout is gone or codex predates `thread/resume`, every turn re-runs
-  live — **no fake thread resurrection**); and replay is **positional**, like the
-  one-shot occurrence counters — same script, same session call order. A worker's
-  prior-run token history is baselined out of the meter, so budgets bill only this
-  run. Workflows that need to pause for a human should still checkpoint-by-return
-  (above) — that composes with warm resume: return `needs_human`, then `--resume`
-  with the answer in `args` and steer the same warm worker onward.
+  **warm**: each turn is journaled under `sess:<workerId>#<turn>` with its verbatim
+  prompt, a prompt hash, and the worker's real kimi session id (`threadId`). On
+  `--resume` the journaled *completed-turn prefix* replays free (0 tokens, `cached`
+  events, zero kimi spawns) and the worker re-attaches to its **persisted kimi
+  session** with `-S <id>`, so new steers run on the full prior context. Replay is
+  **positional** (same script, same session call order) *and* **prompt-checked**:
+  a changed steer prompt (e.g. one built from an edited `human()` answer) stops the
+  replay from that turn onward — it and every later turn re-run live. Honesty
+  rules: if kimi no longer has the session (`Session "…" not found`), the next live
+  turn falls back **once** to a fresh session whose context is rebuilt by
+  prepending a transcript reconstructed from the journaled prompts/results, and the
+  fresh id re-arms `-S`; journals from before prompt recording (synthetic
+  `kimi-session-*` thread ids) invalidate **cleanly** — every session turn re-runs
+  live, and a synthetic id is never passed to `-S`. Replayed turns never touch the
+  meter, so budgets bill only this run's live turns. Workflows that need to pause
+  for a human should still checkpoint-by-return (above) — that composes with warm
+  resume: return `needs_human`, then `--resume` with the answer in `args` and steer
+  the same warm worker onward.
 - **One active turn per session.** `steer()` while a turn runs throws — `wait()` or
   `cancel()` first. (v1 doesn't queue turns.)
 - **Finalization.** Sessions you leave open are closed automatically when the
@@ -283,9 +303,9 @@ prints the workflow's return value, so the human sees the question and resume hi
   explicitly is still good form.
 - **Worktrees** (`isolation:'worktree'`) are created once and **persist across every
   steer**, removed only on `close()`/finalization.
-- **No interactive "needs input" state.** Workers run `approvalPolicy:"never"`, so
-  there's no mid-turn human-input request to surface; "actionable" means the turn
-  ended.
+- **No interactive "needs input" state.** Workers run headless and **full-auto**
+  (`kimi -p` auto-approves every tool action), so there's no mid-turn
+  human-input request to surface; "actionable" means the turn ended.
 
 ## Standard quality patterns
 
@@ -355,7 +375,7 @@ run, claim unverified, file unread?"; its answer becomes the next round.
 
 **Classify-and-act (router)** — one classifier agent labels the task, then the
 script branches to a specialized handler. Use it to give each branch a fresh,
-goal-restated context (fights goal drift). *Codex note:* the native version routes
+goal-restated context (fights goal drift). *Kimi note:* the native version routes
 cheap branches to a smaller model; here, keep one model and let effort be the
 lever (see below). Runnable: `examples/classify-route.workflow.js`.
 
@@ -366,9 +386,10 @@ Runnable: `examples/tournament-sort.workflow.js`.
 
 **Triage + quarantine** — classify a batch in parallel, dedupe in plain code,
 then a single router proposes actions from the *structured labels* — not the raw,
-untrusted item text. Keep the classifiers `sandbox:'read-only'` so untrusted
-content never reaches a write-capable agent (privilege separation shrinks the
-injection surface). Runnable: `examples/triage.workflow.js`.
+untrusted item text. That structural quarantine (router never sees raw item text)
+is the injection-surface control here — **not** the `sandbox` opt, which is an
+advisory label the runner records but does not enforce (every headless kimi agent
+is write-capable). Runnable: `examples/triage.workflow.js`.
 
 **Generate-and-filter** — spawn N candidate attempts, then filter by a rubric or a
 verifier pass; a special case of the judge panel when you only need "good enough,"
@@ -378,28 +399,34 @@ not "the best."
 spin off one verifier per claim against the source; synthesize only what survives.
 This is the shape of the bundled `/deep-research`. Runnable:
 `examples/deep-research.workflow.js` (over a codebase; swap the reader prompts for
-web search if your Codex has web tools).
+web search if your Kimi has web tools).
 
-## Codex-specific authoring notes
+## Kimi-specific authoring notes
 
 - **Agents do the I/O, not the script.** The script is sandboxed (no fs/shell). To
   read or write files, instruct an `agent()` to do it — e.g. *"Read src/auth.ts
-  and …"*. With `sandbox: 'read-only'` an agent can read anywhere; with
-  `workspace-write` it can edit within its cwd.
-- **Schemas**: prefer an object at the root. OpenAI strict structured outputs
-  require **every property to be in `required`** and `additionalProperties:false` on
-  every object — the runner **auto-normalizes** this for you (recursively), so a
-  forgotten `required` key won't 400 the turn. There is no "optional" in strict
-  mode: for a field the model may leave empty, make it **nullable**
-  (`type:['string','null']`) rather than omitting it from `required`. The result is
-  parsed JSON; the runner also tolerates ```json fences as a fallback.
-- **One model, effort is the lever.** The GPT-5.6 Codex series is Sol (flagship),
-  Terra (balanced), and Luna (efficient). Runs use `--frontier`, which dynamically
-  pins the single latest-frontier model (currently `gpt-5.6-sol`) and **overrides
-  any per-call `model`** —
-  so leave `model` out of `agent()` opts. This is a deliberate divergence from the
-  native blog's "classify-and-route to Sonnet vs Opus": instead of *model* routing
-  for cost, this re-host keeps one model and uses **thinking effort** as the dial
+  and …"*. Every agent runs headless **full-auto** (`kimi -p` auto-approves all
+  tool actions), so any agent can read *and write*; the `sandbox` opt only labels
+  intent (journaled + reported, never enforced). Scope what an agent touches with
+  its prompt, `cwd`, and `isolation:'worktree'`.
+- **Schemas**: prefer an object at the root. The runner **strict-normalizes** your
+  schema (recursively: every property into `required`,
+  `additionalProperties:false`) and embeds it in the prompt as an instruction —
+  there is no wire-level enforcement, so nothing can "400"; a non-compliant reply
+  just parses to `null`. For a field the model may leave empty, make it
+  **nullable** (`type:['string','null']`) rather than omitting it from `required`
+  (strictification puts every property in `required` anyway). The result is parsed
+  JSON; the runner also tolerates ```json fences and JSON embedded in prose as a
+  fallback — and resolves `null` when no JSON can be extracted, so downstream code
+  must `.filter(Boolean)`.
+- **One model, effort is the lever.** Usable models are the ones **configured in
+  kimi** (`kimi provider list --json` — on a stock kimi-code install:
+  `kimi-code/kimi-for-coding` and `kimi-code/kimi-for-coding-highspeed`). Runs use
+  `--frontier`, which pins the strongest configured model (here
+  `kimi-code/kimi-for-coding`) and **overrides any per-call `model`** — so leave
+  `model` out of `agent()` opts. This is a deliberate divergence from the native
+  blog's "classify-and-route to Sonnet vs Opus": instead of *model* routing for
+  cost, this re-host keeps one model and uses **thinking effort** as the dial
   (`--auto-effort` scales it to layer width; `--effort`/`--pin-effort`/`--budget`
   bound it). Mixing models or downgrading "cheap" stages is what produces
   inconsistent multi-model runs — don't.
