@@ -5,7 +5,7 @@
 > `kimi -p` prompts, and streams it back as a live **execution map**.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-![Node ≥ 18](https://img.shields.io/badge/node-%E2%89%A5%2018-green.svg)
+![Node ≥ 18.17](https://img.shields.io/badge/node-%E2%89%A5%2018.17-green.svg)
 ![Dependencies: 0](https://img.shields.io/badge/dependencies-0-green.svg)
 [![CI](https://github.com/da-moon/claude-dynamic-workflows-kimi/actions/workflows/ci.yml/badge.svg)](https://github.com/da-moon/claude-dynamic-workflows-kimi/actions/workflows/ci.yml)
 
@@ -53,7 +53,16 @@ The first thing you'll notice is what's *not* in the old one-shot model: **long-
 **As a Claude Code plugin** (recommended — updates with every push):
 
 ```text
-/plugin add https://github.com/da-moon/claude-dynamic-workflows-kimi
+/plugin marketplace add da-moon/claude-dynamic-workflows-kimi
+/plugin install kimi-workflows@kimi-workflows
+```
+
+Then run `/reload-plugins` (or restart Claude Code) to activate it. The
+non-interactive shell equivalent:
+
+```bash
+claude plugin marketplace add da-moon/claude-dynamic-workflows-kimi && \
+  claude plugin install kimi-workflows@kimi-workflows
 ```
 
 **Or as a classic skills-dir clone:**
@@ -62,13 +71,18 @@ The first thing you'll notice is what's *not* in the old one-shot model: **long-
 git clone https://github.com/da-moon/claude-dynamic-workflows-kimi ~/.claude/skills/kimi-workflows
 ```
 
+The clone auto-loads on the next session as the plugin
+`kimi-workflows@skills-dir` — the same `/kimi-workflows` skill as the
+marketplace install, no install step.
+
 (Developing from a clone elsewhere? `npm run sync-skill` pushes the skill
-surface — `SKILL.md`, `references/`, `examples/`, `runner/` — to
-`~/.claude/skills/kimi-workflows` in one command.)
+surface — `SKILL.md`, `.claude-plugin/`, `bin/`, `references/`, `examples/`,
+`runner/` — to `~/.claude/skills/kimi-workflows` in one command; it refuses to
+run when the destination is the repo itself.)
 
 **Prerequisites**
 
-- [Node](https://nodejs.org) ≥ 18 (zero npm dependencies to install)
+- [Node](https://nodejs.org) ≥ 18.17 (zero npm dependencies to install; CI-tested on Node 20 and 24)
 - The [`kimi`](https://code.kimi.com) CLI on your `PATH`, logged in: `kimi login`
 
 Either way the plugin is now available in Claude Code.
@@ -79,13 +93,14 @@ npx github:da-moon/claude-dynamic-workflows-kimi doctor   # → state: ready
 ```
 
 (The same `npx` entrypoint exposes the whole CLI surface without installing
-anything: `run`, `fleet status|answer`, `view`, `map`, `summarize`.)
+anything: `run`, `fleet status|answer`, `supervise`, `view`, `map`,
+`summarize`, `compare`, `doctor`.)
 
 ---
 
 ## Using it in Claude Code
 
-The skill is **manual-invoke only** — the model never auto-triggers it. Load the skill and describe the task in **one or two rough sentences** — there's no need to pre-engineer a prompt; the skill compiles your rough intent into the right workflow itself:
+Claude can **auto-invoke** the skill when you ask for multi-agent Kimi orchestration — a Kimi fan-out, a fleet of Kimi agents, "run this as a Kimi workflow" — and `/kimi-workflows` always invokes it explicitly. Either way, describe the task in **one or two rough sentences** — there's no need to pre-engineer a prompt; the skill compiles your rough intent into the right workflow itself:
 
 ```text
 /kimi-workflows  Audit every route under src/ for missing auth checks
@@ -123,11 +138,11 @@ Behind that one line, Kimi:
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
-The captured output above is preserved from a GPT-5.5 run. The current GPT-5.6
-Kimi series is **Sol** (flagship), **Terra** (balanced), and **Luna**
-(efficient). This skill deliberately does not route stages across those tiers:
-`--frontier` dynamically detects the current flagship and pins the whole run to
-that one model.
+The captured output above is preserved from a run on the original GPT-5.5
+backend (model chips as recorded). On Kimi, the skill deliberately does not
+route stages across model tiers: `--frontier` picks the strongest model
+**configured in your kimi CLI** (`kimi provider list` — e.g.
+`kimi-code/kimi-for-coding`) and pins the whole run to that one model.
 
 ### Steering your run — just ask
 
@@ -138,14 +153,14 @@ You don't manage flags; you describe what you want and Claude wires it up. Commo
 | **Watch it build live** | "…and let me watch it" · "open the live GUI" | opens a browser viewer (`--gui`) and/or a new-terminal ASCII map (`--tui`) that update **in place** as agents run |
 | **See the size/cost first** | "plan it first — how many agents, roughly how much?" | a **no-token dry run** (`--plan`) that counts agents per phase and estimates a budget |
 | **Cap the spend** | "keep it under ~5M tokens" | a hard `--budget` ceiling — tripping it isn't fatal, it prints a one-line `--resume` to continue |
-| **Keep it read-only (safety)** | "read-only — don't let agents write files" | runs every agent with `--sandbox read-only` — a **safety** choice (agents read but never write); good for audits, research, exploration. Not a way to spend less. |
-| **Let it edit files** | "let it apply the migration" | `--sandbox workspace-write` (the default) so agents can write |
+| **Keep it read-only (safety)** | "read-only — don't let agents write files" | authors read-only instructions into every agent's prompt and labels the run `--sandbox read-only`. **Advisory**: the label is journaled and reported, but headless Kimi runs full-auto — nothing mechanically blocks writes ([Safety](#safety)) |
+| **Let it edit files** | "let it apply the migration" | nothing to unlock — agents already run **full-auto** (read/write/shell, no prompting); the run is labeled `--sandbox workspace-write` so the intent is recorded |
 | **Resume after a stop** | "resume that run" | replays already-finished agents from the journal **free**, runs only the rest; sessionful workers re-attach to their persisted threads **warm** |
 | **Be asked before risky steps** | "check with me before applying anything" | authors a `human()` gate — the live viewer shows an **answer card** (choices + free text) right in the run page; the run waits there, fleet warm, and falls back to a safe default on timeout |
 | **Pick a specific pattern** | "do a loop-until-dry bug hunt" · "fresh-context review with independent reviewers" | authors that exact pattern (see the [pattern library](references/authoring.md)) |
 | **Run a supervised fleet** | "`--multi`" · "throw a few different harnesses at this at once" | launches 2–4 concurrent variant workflows in the background and **supervises them itself** — polls `fleet status`, answers their gates, steers, kills dead ends, forks winners, then synthesizes across runs (see walkthrough 8) |
 
-One thing you *don't* tune: it's always **one frontier model for every agent** — no model-mixing. Thinking **effort** scales to the harness instead (a quick 2–5-agent run goes flat `--effort medium`; bigger runs use `--auto-effort`, so lone judge/synthesis gates think hardest). **To spend less**, lower the **budget**, drop the **effort**, narrow the **fan-out**, and **`--plan` first** to size it — never a smaller model. (Read-only is a **safety** choice — what agents may touch — not a cost lever.)
+One thing you *don't* tune: it's always **one frontier model for every agent** — no model-mixing. Thinking **effort** scales to the harness instead (a quick 2–5-agent run goes flat `--effort medium`; bigger runs use `--auto-effort`, so lone judge/synthesis gates think hardest). **To spend less**, lower the **budget**, drop the **effort**, narrow the **fan-out**, and **`--plan` first** to size it — never a smaller model. (Read-only is an **intent label** — what agents *should* touch — not a cost lever, and not yet an enforced one; see [Safety](#safety).)
 
 ### Example invocations
 
@@ -195,7 +210,7 @@ Rough intent is the default — a sentence or two is enough, and the skill compi
 - Every run is journaled to `<project>/.workflow-journal/<name>.jsonl`; ask Claude to **open the last run in the viewer** to revisit a past run.
 - The script Claude wrote stays in your project — rerun or edit it directly, or ask Claude to adjust it.
 
-> **Not what you wanted?** If you actually want **Claude** subagents (not Kimi), use Claude Code's native Workflow tool instead — this skill deliberately routes the work to Kimi/GPT.
+> **Not what you wanted?** If you actually want **Claude** subagents (not Kimi), use Claude Code's native Workflow tool instead — this skill deliberately routes the work to Kimi.
 
 ---
 
@@ -213,7 +228,7 @@ Claude authors a **root-cause lab**: a parallel **Triage** (metrics · logs · r
 
 > `/kimi-workflows  Audit every route under src/ for missing authorization, read-only. Have an independent skeptic try to refute each finding before you report it.`
 
-The classic **find → adversarially-verify** shape, and the reason to use a fleet instead of one agent: one pass *finds* candidates in parallel (one agent per area), then a **second, independent agent tries to refute each** — defaulting to "not a real finding" unless it can prove exploitability with a `file:line`. Plausible-but-wrong findings die in verification instead of in your inbox. You get a deduped table of *confirmed* issues with evidence, and (because it's `--sandbox read-only`) nothing was ever written. Swap "authorization" for "missing input validation", "unhandled promise rejections", "N+1 queries", "PII in logs" — same harness.
+The classic **find → adversarially-verify** shape, and the reason to use a fleet instead of one agent: one pass *finds* candidates in parallel (one agent per area), then a **second, independent agent tries to refute each** — defaulting to "not a real finding" unless it can prove exploitability with a `file:line`. Plausible-but-wrong findings die in verification instead of in your inbox. You get a deduped table of *confirmed* issues with evidence, and every agent is instructed read-only so nothing gets written — though note the `--sandbox read-only` label itself is advisory (recorded, not enforced; see [Safety](#safety)). Swap "authorization" for "missing input validation", "unhandled promise rejections", "N+1 queries", "PII in logs" — same harness.
 
 ### 3 · Load a big thing once, then interrogate it cheaply
 
@@ -260,7 +275,7 @@ You're never locked out of the loop: the same checkpoints stay human-answerable 
 And the supervision layer isn't limited to workflows — it's a documented **file contract** ([fleet-protocol.md](references/fleet-protocol.md)), and the bundled `supervise` shim wraps **any long-running command** in it:
 
 ```bash
-npx github:scasella/claude-dynamic-workflows-kimi supervise --name nightly -- python run_evals.py
+npx github:da-moon/claude-dynamic-workflows-kimi supervise --name nightly -- python run_evals.py
 ```
 
 The job appears in `fleet status` and the dashboard like any run, its output streams as live progress, and a one-line `@@ASK {"question":"Promote?","choices":["yes","no"],"default":"no"}` printed by the job becomes a real supervisor gate — the answer lands on the job's stdin (`read answer` in bash), with the safe default on timeout. Your deploy script, eval run, or data job gets the same supervised-autonomy treatment as a workflow fleet.
@@ -446,7 +461,7 @@ for (const s of first.pendingSessions) await s.cancel();           // stop the l
 **Runnable examples** (all `--plan`-safe — dry-run any with `--plan`, no Kimi, no tokens):
 `sessionful-workers` (the intro) · `warm-context-interrogation` (load once, ask many) · `hedged-take-first-win` (race + cancel) · `flaky-bug-perturbation` (hold a repro, perturb it) · `lead-following-research` (controller chases leads) · `stateful-dialogue` (memory vs. a cold judge) · `agent-foreman` (supervised autonomy, escalate at forks) · `human-gate` (pause at a declared fork, answer in the live viewer, steer the warm worker).
 
-> **Resume (honest):** one-shot `agent()` is resumable as always. Sessions resume **warm**: a `--resume` re-attaches each worker to its persisted Kimi thread (`thread/resume`), replays the already-completed turns free from the journal, and runs only the new steers — on the worker's full prior context. If a thread can't be re-attached (rollout deleted, older kimi), that worker honestly re-runs live. And when a workflow hits a fork only a human should decide, `human(question, {choices, default})` pauses **right there**: with `--gui` an answer card appears in the live viewer (the fleet stays warm while you click), unattended runs fall back to the default after a timeout, and the answer is journaled so a `--resume` never re-asks. Full API, the controller pattern, and the `hands_off` / `checkpointed` / `interactive` involvement modes → [`references/authoring.md`](references/authoring.md#sessionful-workers-long-lived-steerable).
+> **Resume (honest):** one-shot `agent()` is resumable as always. Sessions resume **warm**: a `--resume` replays the already-completed turns free from the journal and re-attaches each worker to its persisted Kimi session (`kimi -S <session id>`), so new steers run on the worker's full prior context — tool calls included. If the persisted session is gone, the worker's next turn falls back to a fresh session rebuilt from its journaled transcript (correct, just not free), and journals from older runner versions simply re-run their session turns live. And when a workflow hits a fork only a human should decide, `human(question, {choices, default})` pauses **right there**: with `--gui` an answer card appears in the live viewer (the fleet stays warm while you click), unattended runs fall back to the default after a timeout, and the answer is journaled so a `--resume` never re-asks. Full API, the controller pattern, and the `hands_off` / `checkpointed` / `interactive` involvement modes → [`references/authoring.md`](references/authoring.md#sessionful-workers-long-lived-steerable).
 
 ---
 
@@ -477,7 +492,7 @@ node runner/bin/map-run.js  <project-dir> --watch
 node runner/bin/summarize-run.js <project-dir>         # also: --json / --markdown / --out PATH
 ```
 
-Key flags: `--frontier` (pin the latest frontier model), `--auto-effort` (scale effort to layer width), `--plan` (dry-run agent count + budget estimate, no tokens), `--budget N` (token ceiling) with `--budget-meter total|output`, `--sandbox read-only|workspace-write`, `--tui` / `--gui` / `--monitor` (live monitors), `--resume`, `--summary` (full end-of-run report). See `node runner/bin/run-workflow.js --help`.
+Key flags: `--frontier` (pin the strongest configured model), `--auto-effort` (scale effort to layer width), `--plan` (dry-run agent count + budget estimate, no tokens; alias `--dry-run`), `--budget N` (token ceiling) with `--budget-meter total|output`, `--sandbox read-only|workspace-write` (advisory intent label — see [Safety](#safety)), `--tui` / `--gui` / `--monitor` (live monitors), `--resume`, `--summary` (full end-of-run report). See `node runner/bin/run-workflow.js --help`.
 
 ### The run summary report
 
@@ -543,15 +558,16 @@ Claude Code's workflow runtime is sealed inside its binary, so this is an **exte
 
 | Workflow concept | Kimi mapping |
 | :--- | :--- |
-| `agent(prompt)` → final text | `thread/start` + `turn/start`, last `agentMessage.text` |
-| `agent(prompt, { schema })` | native `turn/start.outputSchema` (auto-normalized for strict mode) → parsed JSON |
-| `agent.start(prompt)` → session | `thread/start` + first `turn/start`, returns before completion |
-| session resume (`--resume`) | `thread/resume` re-attaches the persisted thread; completed turns replay from the journal |
-| `session.steer(msg)` | another `turn/start` on the **same** thread — a follow-up turn |
-| `agentType: 'x'` | loads `.claude/agents/x.md` → `developerInstructions` |
-| Claude model id / alias | when unpinned, Opus → Sol, Sonnet → Terra, and Haiku → Luna when available; resolved via `model/list` |
-| sandbox / permissions | `approvalPolicy:"never"` + sandbox |
-| transient errors | retry with backoff; app-server auto-reconnect |
+| `agent(prompt)` → final text | one headless `kimi -p <prompt> --output-format stream-json` process; the result is the last assistant line with string content (tool-call/meta lines skipped) |
+| `agent(prompt, { schema })` | the (strictified) JSON Schema is embedded in the prompt; the reply is parsed as JSON — `null` if the model doesn't comply |
+| `agent.start(prompt)` → session | a first `kimi -p` turn; the trailing `session.resume_hint` meta line's `session_id` becomes the worker's thread id |
+| `session.steer(msg)` | `kimi -S <session id> -p <msg>` — a follow-up turn on the **same** persisted session (only the new prompt is sent) |
+| session resume (`--resume`) | completed turns replay **free** from the journal; the worker re-attaches to its persisted session via `-S` |
+| `session.cancel()` | terminates the live kimi subprocess — the turn resolves `cancelled`, race losers stop billing |
+| `agentType: 'x'` | loads `.kimi/agents/x.md` (or `.claude/agents/x.md`) → the system prompt |
+| Claude model id / alias | mapped to a **configured** Kimi model (`kimi provider list`): opus/sonnet → `kimi-for-coding`, haiku → `kimi-for-coding-highspeed` |
+| sandbox / permissions | **full-auto** — headless `kimi -p` auto-approves every tool action; `sandbox` is recorded as advisory metadata ([Safety](#safety)) |
+| transient errors | retry with backoff (default 3); permanent errors (unconfigured model, bad flags, config.invalid) fail fast |
 | `parallel` / `pipeline` / `phase` / `budget` | unchanged — provider-neutral JS |
 
 Workflow scripts run in an isolated `node:vm` context (no `fs`/`process`/`fetch`; non-deterministic builtins blocked) — the agents do the I/O, the script coordinates. A resume journal caches each completed agent so reruns skip unchanged work.
@@ -562,24 +578,27 @@ Full internals, the protocol mapping, and a faithfulness comparison vs. the nati
 
 ## Requirements & compatibility
 
-- **Node ≥ 18**, zero npm dependencies.
-- A logged-in **`kimi` CLI** with the `app-server` subcommand. Built and verified against `kimi` **0.144.0**; method names/shapes are stable, but you can regenerate bindings for your version with `kimi -p generate-json-schema --out DIR`.
+- **Node ≥ 18.17**, zero npm dependencies (CI-tested on Node 20 and 24).
+- A logged-in **`kimi` CLI** on `PATH`. Built and verified against `kimi` **0.23.3** — the runner drives it via `kimi -p … --output-format stream-json`, and a version drift prints a warning, not an error. Verify your environment with `npm run doctor` (or `npx github:da-moon/claude-dynamic-workflows-kimi doctor`).
 
 ## Safety
 
-Workflow agents run with `approvalPolicy: "never"` inside a Kimi sandbox (default `sandbox: workspace-write`) — like any autonomous agent run, they read, write, and execute shell commands **without prompting**. For untrusted or exploratory tasks, tell Claude to keep it **read-only** (or pass `--sandbox read-only`), and read a workflow script before you run it. The workflow *script itself* is isolated (no filesystem/network/process access) — only the agents act.
+**Every agent runs full-auto — that is the supported default.** Each `agent()` turn is a headless `kimi -p` run, and headless Kimi **auto-approves every tool action**: agents read, write, and execute shell commands without prompting, and the runner adds no permission gate of its own (kimi 0.23.3 exposes none for `-p` — a headless run is already unrestricted). The `--sandbox` flag and the per-call `sandbox` opt are **advisory metadata**: recorded in the journal (part of each agent's cache identity) and shown in run reports — useful for documenting intent — but they do **not** enforce anything. `--sandbox read-only` does not prevent writes. Mechanical sandbox enforcement is planned but not implemented yet.
+
+Practical guidance: read a workflow script before you run it, put explicit read-only instructions in the prompts of audit/research agents, and run untrusted or exploratory tasks in a disposable checkout, worktree, or container. The workflow *script itself* is isolated (a locked-down `node:vm` — no filesystem/network/process access) — only the agents act.
 
 ## Limitations (honest)
 
 - This is a **standalone re-host**, not the in-Claude-Code-native experience: no in-session background tasks, no `/workflows` progress UI, no save-as-`/command` — though the live viewer and inline map cover monitoring, and `workflow("name")` resolves saved workflows from `.claude/workflows/`.
 - A couple of native nuances aren't replicated 1:1: one-shot `agent()` resume replays *results* (the journal), not thread state — single stateless turns have no state worth forking — and budget accounting is per-process (`--budget-meter` selects total vs the native output-token pool). The map models barrier/phase structure (a clean approximation for pipeline-shaped runs). Details in the internals doc.
-- **Session resume depends on the persisted rollout.** A `--resume` re-attaches each worker to its prior Kimi thread (`thread/resume`) and replays completed turns free; if the rollout is gone or the kimi version predates `thread/resume`, that worker's turns re-run live (correct, just not free). Turn replay is positional — edit the script's session *call order* and the replayed prefix re-runs.
+- **Session resume depends on the persisted Kimi session.** A `--resume` replays completed turns free from the journal and re-attaches each worker to its prior session (`kimi -S <session id>`); if that session is gone, the worker's next turn falls back to a fresh session rebuilt from its journaled transcript (correct, just not free), and journals from older runner versions re-run their session turns live. Turn replay is prompt-checked — edit a steer's prompt and the replay stops at that turn.
 
 ## Development
 
 ```bash
 npm test        # offline unit checks + viewer/map robustness across run shapes (no Kimi, no network)
-npm run doctor  # verify the local Kimi App Server is reachable & logged in
+npm run doctor  # verify the kimi CLI is reachable & logged in (configured models,
+                # frontier pick, one minimal live turn; --offline skips the live turn)
 npm run demo    # open the bundled sample run in the viewer
 ```
 
@@ -588,7 +607,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Repository layout
 
 ```
-SKILL.md                  the Claude Code skill (manual-invoke /kimi-workflows)
+SKILL.md                  the Claude Code skill (auto-invocable; /kimi-workflows invokes it manually)
 runner/                   standalone runner (Node, zero deps)
   bin/run-workflow.js     execute a workflow script on Kimi
   bin/view-run.js         generate the HTML run viewer (--watch for live)
