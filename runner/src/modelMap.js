@@ -8,19 +8,31 @@ export function modelId(m) {
   return null;
 }
 
-// Claude tier -> ordered Kimi preferences (first available wins).
-// Kimi CLI exposes models such as kimi-latest, kimi-k2-6, kimi-k2-5, kimi-lite, etc.
+// Claude tier -> ordered Kimi preferences (first configured match wins).
+// The usable set comes from `kimi provider list --json` (config.toml); ids are
+// provider-prefixed. Verified on kimi 0.23.3: kimi-code/kimi-for-coding and
+// kimi-code/kimi-for-coding-highspeed. Preferences are bare model names matched
+// exactly or after the provider prefix; later entries cover other installs.
 const FAMILY_PREFERENCES = {
-  opus: ["kimi-latest", "kimi-k2-6", "kimi-k2-5", "kimi-k2"],
-  sonnet: ["kimi-latest", "kimi-k2-5", "kimi-k2-6", "kimi-k2"],
-  haiku: ["kimi-lite", "kimi-k2-5", "kimi-latest", "kimi-k2"],
+  opus: ["kimi-for-coding", "kimi-latest", "kimi-k2-6", "kimi-k2-5", "kimi-k2"],
+  sonnet: ["kimi-for-coding", "kimi-latest", "kimi-k2-5", "kimi-k2-6", "kimi-k2"],
+  haiku: ["kimi-for-coding-highspeed", "kimi-for-coding", "kimi-lite", "kimi-k2-5", "kimi-latest", "kimi-k2"],
 };
 
-// Common aliases that may be used in scripts or agent definitions.
+// Common aliases that may be used in scripts or agent definitions: ordered
+// preference lists, first configured match wins (first entry when the model
+// list is unavailable).
 const MODEL_ALIASES = {
-  "kimi": "kimi-latest",
-  "frontier": "kimi-latest",
+  "kimi": ["kimi-for-coding", "kimi-latest"],
+  "frontier": ["kimi-for-coding", "kimi-latest"],
 };
+
+// Match a bare preference name against the configured list: exact id, or the
+// model name after a provider prefix ("kimi-for-coding" matches
+// "kimi-code/kimi-for-coding" and "~kimi-code~kimi-for-coding" forms).
+function findConfigured(name, available) {
+  return available.find((m) => m === name || m.endsWith(`/${name}`) || m.endsWith(`~${name}`));
+}
 
 // Matches Claude full ids ("claude-opus-4-8") and bare aliases ("opus").
 function claudeFamily(id) {
@@ -42,7 +54,7 @@ function isKimiModel(id) {
  *   Claude id or alias                -> mapped family preference (best available)
  *   already-available id              -> as-is
  *   unknown but unavailable           -> undefined (config default) + warn
- * If `available` is empty (provider catalog unavailable), Claude ids still map to
+ * If `available` is empty (`kimi provider list` unavailable), Claude ids still map to
  * their top preference and other ids pass through unchanged.
  */
 export function resolveModel(requested, available = [], log = () => {}) {
@@ -52,7 +64,7 @@ export function resolveModel(requested, available = [], log = () => {}) {
   if (family) {
     const prefs = FAMILY_PREFERENCES[family] || [];
     const pick = available.length
-      ? (prefs.find((m) => available.includes(m)) ??
+      ? (prefs.map((p) => findConfigured(p, available)).find(Boolean) ??
          available.find((m) => isKimiModel(m) && !/mini|spark/i.test(m)) ??
          available[0])
       : prefs[0];
@@ -63,27 +75,37 @@ export function resolveModel(requested, available = [], log = () => {}) {
     return undefined;
   }
 
-  // Preserve an exact catalog id before expanding API aliases. Also accept a
-  // bare id when the catalog lists it with a provider prefix (e.g. "kimi-latest"
-  // matches "moonshotai/kimi-latest" or "~moonshotai/kimi-latest").
-  const bareMatch = available.find((m) => m === requested || m.endsWith(`/${requested}`) || m.endsWith(`~${requested}`));
-  if (bareMatch) return bareMatch;
+  // An exactly-configured id passes through untouched.
+  if (available.includes(requested)) return requested;
 
-  const alias = MODEL_ALIASES[String(requested).toLowerCase()];
-  if (alias && (!available.length || available.includes(alias))) {
-    log(`model: '${requested}' -> '${alias}'`);
-    return alias;
+  // Expand API aliases BEFORE suffix matching, so "frontier" resolves to its
+  // intended target instead of suffix-matching an unrelated id (e.g. a
+  // hypothetical "someprovider/frontier").
+  const aliasPrefs = MODEL_ALIASES[String(requested).toLowerCase()];
+  if (aliasPrefs) {
+    const pick = available.length
+      ? aliasPrefs.map((p) => findConfigured(p, available)).find(Boolean)
+      : aliasPrefs[0];
+    if (pick) {
+      log(`model: '${requested}' -> '${pick}'`);
+      return pick;
+    }
+  } else {
+    // Accept a bare id when the configured list has it with a provider prefix
+    // (e.g. "kimi-for-coding" matches "kimi-code/kimi-for-coding").
+    const bareMatch = findConfigured(requested, available);
+    if (bareMatch) return bareMatch;
+    if (!available.length) return requested; // can't validate -- trust it
   }
 
-  if (!available.length) return requested; // non-Claude id, can't validate -- trust it
-
-  log(`model: '${requested}' not exposed by Kimi -> using config default (have: ${available.join(", ")})`);
+  log(`model: '${requested}' not configured in Kimi -> using config default (have: ${available.join(", ")})`);
   return undefined;
 }
 
-// Pick the latest frontier model from a Kimi provider catalog result: the newest,
-// strongest general model. Prefers "kimi-latest", then the newest kimi-k2-* model,
-// then any other kimi-* model, excluding mini/spark variants.
+// Pick the frontier model from the CONFIGURED model list (`kimi provider list`):
+// the newest, strongest general model. Prefers "kimi-latest", then
+// "kimi-for-coding" (ties broken toward the plain id over -highspeed), then the
+// newest kimi-k2-* model, then any other model, excluding mini/spark variants.
 export function pickFrontier(models = []) {
   const id = (m) => (typeof m === "string" ? m : m?.id ?? m?.model ?? m?.slug ?? m?.name);
   const versionParts = (s) => {
@@ -101,7 +123,8 @@ export function pickFrontier(models = []) {
   };
   const strength = (s) => {
     const value = String(s).toLowerCase();
-    if (value === "kimi-latest" || value.endsWith("/kimi-latest") || value.endsWith("~kimi-latest")) return 4;
+    if (value === "kimi-latest" || value.endsWith("/kimi-latest") || value.endsWith("~kimi-latest")) return 5;
+    if (/kimi-for-coding/.test(value)) return 4; // both variants; length tiebreak prefers the plain id
     if (/k2\.6/.test(value) || /k2-6/.test(value)) return 3;
     if (/k2\.5/.test(value) || /k2-5/.test(value)) return 2;
     if (/k2/.test(value)) return 1;

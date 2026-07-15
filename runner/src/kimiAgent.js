@@ -44,7 +44,7 @@ export function strictifySchema(s) {
 }
 
 let clientPromise; // lazily-connected, self-healing singleton
-let availableModels = []; // ids exposed by `kimi provider catalog list --json`
+let availableModels = []; // usable model ids from `kimi provider list --json` (config.toml)
 
 // A minimal client stand-in for compatibility with the parts of the runner that
 // still expect a "client" (e.g. --frontier model listing). Kimi has no long-lived
@@ -60,10 +60,15 @@ class KimiClient {
   }
 }
 
+// List the models `kimi --model` will actually accept: the CONFIGURED set from
+// `kimi provider list --json` (config.toml), NOT the models.dev discovery catalog
+// (`kimi provider catalog list`), whose ~5,700 ids all fail with config.invalid
+// unless configured. Verified on kimi 0.23.3: the JSON has a top-level `models`
+// object keyed by usable ids (e.g. "kimi-code/kimi-for-coding").
 async function listKimiModels(options) {
   const cwd = options.cwd ?? process.cwd();
   return new Promise((resolve) => {
-    const child = spawn("kimi", ["provider", "catalog", "list", "--json"], {
+    const child = spawn("kimi", ["provider", "list", "--json"], {
       cwd,
       stdio: ["ignore", "pipe", "pipe"],
       env: process.env,
@@ -76,14 +81,11 @@ async function listKimiModels(options) {
     child.on("exit", (code) => {
       if (code !== 0 || !stdout.trim()) return resolve([]);
       try {
-        const catalog = JSON.parse(stdout);
-        const ids = [];
-        for (const provider of Object.values(catalog)) {
-          if (provider && typeof provider.models === "object") {
-            for (const id of Object.keys(provider.models)) ids.push(id);
-          }
-        }
-        resolve(ids);
+        const parsed = JSON.parse(stdout);
+        const models = parsed && typeof parsed.models === "object" && !Array.isArray(parsed.models)
+          ? parsed.models
+          : {};
+        resolve(Object.keys(models));
       } catch {
         resolve([]);
       }
@@ -116,7 +118,7 @@ export async function shutdownClient() {
   availableModels = [];
 }
 
-// The model ids exposed by the most recent catalog list.
+// The usable model ids from the most recent `kimi provider list` call.
 export function getAvailableModels() {
   return availableModels;
 }
@@ -319,7 +321,12 @@ const RETRYABLE_CODES = new Set([
 ]);
 const RETRYABLE_MSG =
   /(Transport is not connected|app-server exited|timed out|ECONNRESET|EPIPE|socket hang up|stream (disconnected|connection)|killed by signal|exited with code)/i;
-const NONRETRYABLE_MSG = /(BadRequest|Unauthorized|ContextWindowExceeded|invalid request|outputSchema|did not return)/i;
+// Permanent, deterministic failures (checked BEFORE the retryable patterns):
+// misconfigured models (`config.invalid: Model "..." is not configured`), bad
+// flags, and impossible flag combinations ("Cannot combine --prompt with --yolo")
+// fail identically on every attempt — retrying only burns backoff time.
+const NONRETRYABLE_MSG =
+  /(BadRequest|Unauthorized|ContextWindowExceeded|invalid request|outputSchema|did not return|config\.invalid|is not configured|unknown option|Cannot combine)/i;
 
 function errorCode(e) {
   const ci = e?.kimiErrorInfo;

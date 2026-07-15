@@ -8,7 +8,10 @@ import { promisify } from "node:util";
 const exec = promisify(execFile);
 
 // Bump when the runner is re-verified against a newer Kimi CLI.
-export const VERIFIED_KIMI_VERSION = "0.23.6";
+// 0.23.3: empirically verified -p / --output-format stream-json / --model with
+// configured ids / -S resume, plus `kimi provider list --json` as the source of
+// usable model ids.
+export const VERIFIED_KIMI_VERSION = "0.23.3";
 
 export async function detectKimiVersion() {
   try {

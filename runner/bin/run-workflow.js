@@ -15,7 +15,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { runWorkflowFile } from "../src/runWorkflow.js";
 import { getClient, shutdownClient } from "../src/kimiAgent.js";
-import { pickFrontier } from "../src/modelMap.js";
+import { pickFrontier, resolveModel } from "../src/modelMap.js";
 import { Journal } from "../src/journal.js";
 import { eventsPathFor, resultPathFor, progressPathFor, runMetaPathFor, questionsPathFor, answersPathFor } from "../src/runModel.js";
 import { summarizeRun, renderSummaryText, renderEndOfRun } from "../src/runSummary.js";
@@ -108,9 +108,11 @@ if (opts.help || !opts.script) {
       "                   question goes pending and when the run ends; the event JSON\n" +
       "                   is in $WORKFLOW_EVENT. Implies --interactive. e.g. macOS:\n" +
       "                   --notify-cmd 'osascript -e \"display notification \\\"$WORKFLOW_EVENT\\\"\"'\n" +
-      "  --frontier       pin ALL agents to the latest frontier model (auto-detected),\n" +
-      "                   overriding any per-call model in the script\n" +
-      "  --pin-model M    pin ALL agents to model M, overriding any per-call model\n" +
+      "  --frontier       pin ALL agents to the strongest model configured in kimi\n" +
+      "                   (auto-detected from `kimi provider list`), overriding any\n" +
+      "                   per-call model in the script\n" +
+      "  --pin-model M    pin ALL agents to model M (validated against the configured\n" +
+      "                   set; fails fast if M is not usable), overriding any per-call model\n" +
       "  --auto-effort    scale thinking effort to each layer's parallel width:\n" +
       "                   1 agent->xhigh, 2+ agents->high (floor). Critical single-agent\n" +
       "                   gates (consolidate/judge/report) get the highest auto-policy tier.\n" +
@@ -266,7 +268,9 @@ if (opts.plan) {
 
 // `pinnedModel` (from --frontier or --pin-model) is authoritative: every agent
 // uses it, overriding any per-call `model` a script sets. --frontier auto-detects
-// the latest frontier model from the Kimi provider catalog (warming the shared connection).
+// the strongest model among those CONFIGURED in kimi (`kimi provider list`,
+// warming the shared connection). A pin that doesn't resolve to a configured
+// model fails fast here instead of letting every agent die with config.invalid.
 let pinnedModel = opts.pinModel ?? undefined;
 if (opts.frontier) {
   try {
@@ -278,10 +282,29 @@ if (opts.frontier) {
     process.exit(1);
   }
   if (!pinnedModel) {
-    console.error("--frontier: could not determine a frontier model from the Kimi provider catalog");
+    console.error("--frontier: no configured model found (check `kimi provider list --json` / config.toml)");
     await shutdownClient();
     process.exit(1);
   }
+} else if (pinnedModel) {
+  // Validate --pin-model against the configured set (best-effort: skipped when
+  // the list is unavailable) and resolve aliases/Claude ids eagerly so the pin
+  // logged below is the id actually passed to `kimi --model`.
+  try {
+    const client = await getClient();
+    const configured = await client.listModels();
+    if (configured.length) {
+      const resolved = resolveModel(pinnedModel, configured);
+      if (!resolved && !/^(inherit|default)$/i.test(pinnedModel)) {
+        console.error(
+          `--pin-model: '${pinnedModel}' is not configured in kimi (config.toml); configured: ${configured.join(", ")}`,
+        );
+        await shutdownClient();
+        process.exit(1);
+      }
+      pinnedModel = resolved;
+    }
+  } catch {}
 }
 if (pinnedModel) console.error(`⊙ pinning all agents to model: ${pinnedModel}`);
 

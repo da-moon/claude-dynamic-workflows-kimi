@@ -148,13 +148,45 @@ const exec = promisify(execFile);
   assert.equal(resolveModel("inherit", have), undefined, "inherit -> config default");
   assert.equal(resolveModel(undefined, have), undefined, "undefined -> config default");
   assert.equal(resolveModel("made-up-model", have), undefined, "unknown -> config default");
-  assert.equal(resolveModel("claude-opus", []), "kimi-latest", "claude maps even with empty model list");
-  assert.equal(resolveModel("kimi", []), "kimi-latest", "alias maps even with empty model list");
+  assert.equal(resolveModel("claude-opus", []), "kimi-for-coding", "claude maps even with empty model list");
+  assert.equal(resolveModel("kimi", []), "kimi-for-coding", "alias maps even with empty model list");
 
   const legacy = ["kimi-k2", "kimi-lite"];
   assert.equal(resolveModel("opus", legacy), "kimi-k2", "older catalogs retain the Opus fallback");
   assert.equal(resolveModel("sonnet", legacy), "kimi-k2", "older catalogs retain the Sonnet fallback");
   assert.equal(resolveModel("haiku", legacy), "kimi-lite", "older catalogs retain the Haiku fallback");
+
+  // The real kimi 0.23.3 configured set (`kimi provider list --json` .models keys):
+  // provider-prefixed ids, matched by exact id or bare model-name suffix.
+  const configured = ["kimi-code/kimi-for-coding", "kimi-code/kimi-for-coding-highspeed"];
+  assert.equal(resolveModel("opus", configured), "kimi-code/kimi-for-coding", "opus -> configured coding model");
+  assert.equal(resolveModel("sonnet", configured), "kimi-code/kimi-for-coding", "sonnet -> configured coding model");
+  assert.equal(
+    resolveModel("haiku", configured),
+    "kimi-code/kimi-for-coding-highspeed",
+    "haiku -> configured highspeed variant",
+  );
+  assert.equal(
+    resolveModel("kimi-for-coding", configured),
+    "kimi-code/kimi-for-coding",
+    "bare model name matches provider-prefixed id",
+  );
+  assert.equal(
+    resolveModel("kimi-code/kimi-for-coding", configured),
+    "kimi-code/kimi-for-coding",
+    "exact configured id passes through",
+  );
+  assert.equal(
+    resolveModel("frontier", configured),
+    "kimi-code/kimi-for-coding",
+    "frontier alias -> configured coding model",
+  );
+  assert.equal(
+    resolveModel("frontier", [...configured, "someprovider/frontier"]),
+    "kimi-code/kimi-for-coding",
+    "alias expansion beats accidental suffix matches",
+  );
+  assert.equal(resolveModel("kimi-k2-6", configured), undefined, "unconfigured id -> config default");
 }
 
 // 9) agentType: read system prompt + model from .kimi/agents/<name>.md, with .claude fallback.
@@ -190,6 +222,33 @@ const exec = promisify(execFile);
     "context window exceeded not retryable",
   );
   assert.equal(isRetryable(new Error("some unknown failure")), false, "unknown errors not retried");
+
+  // Permanent config/CLI failures short-circuit retries (real kimi 0.23.3
+  // stderr shapes wrapped in the spawnKimi 'exited with code' message).
+  assert.equal(
+    isRetryable(
+      new Error(
+        'Kimi exited with code 1; stderr=error: failed to run prompt: config.invalid: Model "kimi-k2-6" is not configured in config.toml.',
+      ),
+    ),
+    false,
+    "config.invalid model errors not retried",
+  );
+  assert.equal(
+    isRetryable(new Error("Kimi exited with code 2; stderr=error: Cannot combine --prompt with --yolo.")),
+    false,
+    "impossible flag combinations not retried",
+  );
+  assert.equal(
+    isRetryable(new Error("Kimi exited with code 2; stderr=error: unknown option '--bogus'")),
+    false,
+    "bad flags not retried",
+  );
+  assert.equal(
+    isRetryable(new Error("Kimi exited with code 1; stderr=upstream 502")),
+    true,
+    "generic nonzero exits remain retryable",
+  );
 }
 
 // 11) frontier selection: newest, strongest non-mini/spark general model.
@@ -216,6 +275,16 @@ const exec = promisify(execFile);
   );
   assert.equal(pickFrontier([{ id: "kimi-latest", hidden: true }, { id: "kimi-k2-6" }]), "kimi-k2-6", "skips hidden");
   assert.equal(pickFrontier([]), undefined, "empty → undefined");
+  assert.equal(
+    pickFrontier(["kimi-code/kimi-for-coding", "kimi-code/kimi-for-coding-highspeed"]),
+    "kimi-code/kimi-for-coding",
+    "real configured set: plain coding model over highspeed",
+  );
+  assert.equal(
+    pickFrontier(["kimi-code/kimi-for-coding-highspeed", "kimi-code/kimi-for-coding"]),
+    "kimi-code/kimi-for-coding",
+    "order-independent over the configured set",
+  );
 }
 
 // 12) auto-effort: layer width drives thinking effort. Exercises the vm path and
@@ -377,10 +446,10 @@ const exec = promisify(execFile);
 
 // 20) Kimi version drift note: null when matching/unknown, warns on mismatch.
 {
-  assert.equal(VERIFIED_KIMI_VERSION, "0.23.6", "compatibility marker tracks the verified Kimi CLI");
-  assert.equal(versionDriftNote("0.23.6"), null, "match -> no note");
+  assert.equal(VERIFIED_KIMI_VERSION, "0.23.3", "compatibility marker tracks the verified Kimi CLI");
+  assert.equal(versionDriftNote("0.23.3"), null, "match -> no note");
   assert.equal(versionDriftNote(null), null, "unknown version -> no note");
-  assert.match(versionDriftNote("0.24.0"), /0\.24\.0[\s\S]*0\.23\.6/, "drift -> warns with both versions");
+  assert.match(versionDriftNote("0.24.0"), /0\.24\.0[\s\S]*0\.23\.3/, "drift -> warns with both versions");
 }
 
 // 21) lifecycle events: a start + end per agent, carrying phase/effort/metrics.
