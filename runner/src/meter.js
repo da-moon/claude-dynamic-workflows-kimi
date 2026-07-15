@@ -1,8 +1,11 @@
-// Token accounting, fed by `thread/tokenUsage/updated` notifications.
+// Token accounting behind the workflow `budget` global and per-agent attribution.
 //
-// The notification carries `tokenUsage.total`, a per-thread *cumulative*
-// TokenUsageBreakdown. We keep the latest breakdown per thread, which backs two
-// things: the workflow `budget.spent()` global (summed across threads), and
+// The Kimi CLI reports no per-turn token usage, so kimiAgent feeds this meter
+// with per-turn ESTIMATES (~4 chars/token, see estimateTokens) under a unique
+// key per completed turn. The interface is kept general — recordTokenUsage
+// accepts a per-key *cumulative* breakdown (`tokenUsage.total`), the shape an
+// app-server-style backend would push — and we keep the latest breakdown per
+// key, which backs two things: `budget.spent()` (summed across keys) and
 // per-agent attribution for the run journal / viewer (`tokensForThread`).
 
 const perThread = new Map(); // threadId -> { input, output, reasoning, total }

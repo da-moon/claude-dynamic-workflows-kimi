@@ -12,7 +12,7 @@ import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { resolveModel } from "./modelMap.js";
 import { loadAgentType } from "./agentTypes.js";
-import { estimateTokens } from "./meter.js";
+import { estimateTokens, recordTokenUsage } from "./meter.js";
 
 // Normalize an authored JSON Schema for OpenAI strict structured outputs, which
 // require EVERY property to be listed in `required` and `additionalProperties:false`
@@ -45,6 +45,7 @@ export function strictifySchema(s) {
 
 let clientPromise; // lazily-connected, self-healing singleton
 let availableModels = []; // usable model ids from `kimi provider list --json` (config.toml)
+let meterSeq = 0; // unique meter key per completed turn (estimates are per-turn deltas)
 
 // A minimal client stand-in for compatibility with the parts of the runner that
 // still expect a "client" (e.g. --frontier model listing). Kimi has no long-lived
@@ -225,12 +226,25 @@ async function runOneTurn(prompt, opts) {
   }
 
   const text = result.text ?? "";
-  const tokens = estimateTokens(fullPrompt) + estimateTokens(text);
+  const inputTokens = estimateTokens(fullPrompt);
+  const outputTokens = estimateTokens(text);
+  const tokens = inputTokens + outputTokens;
+
+  // Feed the run-wide meter, which backs `budget.spent()` and the `--budget`
+  // gate. The headless Kimi CLI reports no per-turn token usage, so the meter
+  // runs on the same ~4-chars/token estimates as per-agent attribution (they
+  // exclude the agent's own tool traffic, so treat budgets as a coarse
+  // backstop). Estimates are per-turn deltas, not cumulative-per-thread totals
+  // like an app-server's — hence a unique meter key per completed turn.
+  recordTokenUsage({
+    threadId: `est-${++meterSeq}`,
+    tokenUsage: { total: { inputTokens, outputTokens, reasoningOutputTokens: 0 } },
+  });
 
   opts.onMetrics?.({
     ms: Date.now() - startedAt,
     model: model ?? null,
-    tokens: { total: tokens, input: estimateTokens(fullPrompt), output: tokens - estimateTokens(fullPrompt), reasoning: 0 },
+    tokens: { total: tokens, input: inputTokens, output: outputTokens, reasoning: 0 },
   });
 
   return parseSchemaResult(text, schema);

@@ -24,6 +24,7 @@ import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { kimiAgent, getClient, shutdownClient } from "../src/kimiAgent.js";
+import { resetMeter, tokensSpent } from "../src/meter.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURE = join(HERE, "fixtures", "kimi-stream.ndjson");
@@ -119,6 +120,17 @@ try {
     const [args] = await promptCalls();
     const m = args.indexOf("--model");
     assert.equal(args[m + 1], "kimi-code/kimi-for-coding-highspeed", "pin wins and passes through untouched");
+  }
+
+  // 4) A completed turn feeds the run-wide meter (budget.spent() / --budget):
+  //    the Kimi CLI reports no usage, so the meter runs on estimates — but it
+  //    must MOVE, or budget enforcement is dead.
+  {
+    resetMeter();
+    assert.equal(tokensSpent(), 0);
+    await kimiAgent("bill me", { retries: 0 });
+    assert.ok(tokensSpent() > 0, "a completed turn records estimated tokens into the meter");
+    resetMeter();
   }
 
   console.log("kimi-agent.spawn.test: all checks passed");
