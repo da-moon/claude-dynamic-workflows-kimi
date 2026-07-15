@@ -5,12 +5,13 @@
 //
 //   npm run sync-skill            # repo -> ~/.claude/skills/kimi-workflows
 //
-// Copies SKILL.md + references/ + examples/ + runner/, excluding OS noise and
-// local run artifacts (but keeping the bundled demo's committed journal). The
-// destination is replaced wholesale, so renames/deletions propagate too.
+// Copies SKILL.md + .claude-plugin/ + bin/ + references/ + examples/ + runner/,
+// excluding OS noise and local run artifacts (but keeping the bundled demos'
+// committed journals). The destination is replaced wholesale, so
+// renames/deletions propagate too.
 
-import { cpSync, rmSync, mkdirSync, existsSync, readFileSync } from "node:fs";
-import { join, dirname, basename, sep } from "node:path";
+import { cpSync, rmSync, mkdirSync, existsSync, readFileSync, realpathSync } from "node:fs";
+import { join, dirname, basename, resolve, sep } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 
@@ -18,14 +19,17 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DEST = process.argv[2] || join(homedir(), ".claude", "skills", "kimi-workflows");
 
 // Local artifacts that must not ship: OS noise, generated viewer pages, and
-// run journals -- EXCEPT the bundled demo's committed journal, which is the
-// no-model-required showcase.
-const KEEP_JOURNAL = join(SRC, "examples", "incident-demo", ".workflow-journal");
+// run journals -- EXCEPT the bundled demos' committed journals, which are the
+// no-model-required showcases (the same set .gitignore un-ignores).
+const KEEP_JOURNALS = new Set([
+  join(SRC, "examples", "demo", ".workflow-journal"),
+  join(SRC, "examples", "incident-demo", ".workflow-journal"),
+]);
 const skip = (p) => {
   const b = basename(p);
   if (b === ".DS_Store" || b === "node_modules") return true;
   if (b.endsWith(".run.html")) return true;
-  if (b === ".workflow-journal" && p !== KEEP_JOURNAL) return true;
+  if (b === ".workflow-journal" && !KEEP_JOURNALS.has(p)) return true;
   return false;
 };
 const filter = (s) => !skip(s);
@@ -35,14 +39,29 @@ if (!existsSync(join(SRC, "SKILL.md"))) {
   process.exit(1);
 }
 
+// The destination is deleted wholesale below -- refuse when that would delete
+// the repo itself (DEST is the repo root, or an ancestor of it). This is the
+// case when the repo IS the skills-dir clone the README recommends: there is
+// nothing to sync, and proceeding would destroy .git and any uncommitted work.
+const real = (p) => { try { return realpathSync(p); } catch { return resolve(p); } };
+const srcAbs = real(SRC);
+const destAbs = real(DEST);
+if (destAbs === srcAbs || srcAbs.startsWith(destAbs + sep)) {
+  console.error(
+    `sync-skill: destination (${destAbs}) is the repo itself -- refusing to delete it.\n` +
+      "You are already running from the synced location; nothing to do.",
+  );
+  process.exit(1);
+}
+
 rmSync(DEST, { recursive: true, force: true });
 mkdirSync(DEST, { recursive: true });
 cpSync(join(SRC, "SKILL.md"), join(DEST, "SKILL.md"));
-for (const dir of ["references", "examples", "runner"]) {
+for (const dir of [".claude-plugin", "bin", "references", "examples", "runner"]) {
   cpSync(join(SRC, dir), join(DEST, dir), { recursive: true, filter });
 }
 
 const ver = JSON.parse(readFileSync(join(SRC, "package.json"), "utf8")).version;
 console.log(`synced skill (v${ver}) -> ${DEST}`);
-console.log(`  SKILL.md + references${sep} + examples${sep} + runner${sep}`);
+console.log(`  SKILL.md + .claude-plugin${sep} + bin${sep} + references${sep} + examples${sep} + runner${sep}`);
 console.log("  (excluded: .DS_Store, node_modules, *.run.html, local .workflow-journal dirs)");
