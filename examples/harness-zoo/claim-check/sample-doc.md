@@ -7,7 +7,7 @@ ClaimCheck catching it.
 
 - The project has **zero npm dependencies** — `package.json`'s `dependencies` block
   is empty.
-- It targets **Node.js 18 or newer** (`engines.node` is `">=18"`).
+- It targets **Node.js 18.17 or newer** (`engines.node` is `">=18.17"`).
 - The flagship harness-zoo template is **GoalLint**, which hardens a vague agent
   `/goal` before you dispatch a fleet — it runs as **eleven agents** (1 Parse + 7
   Critique + 1 Rewrite + 1 Verify + 1 Report).

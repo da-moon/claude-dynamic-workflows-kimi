@@ -12,7 +12,7 @@
   },
   "homepage": "https://github.com/da-moon/claude-dynamic-workflows-kimi#readme",
   "bugs": "https://github.com/da-moon/claude-dynamic-workflows-kimi/issues",
-  "engines": { "node": ">=18" },
+  "engines": { "node": ">=18.17" },
   "bin": { "kimi-workflows": "bin/kimi-workflows.js" },
   "scripts": {
     "sync-skill": "node scripts/sync-skill.js",
