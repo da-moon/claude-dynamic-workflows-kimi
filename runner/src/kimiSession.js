@@ -15,7 +15,7 @@
 // to re-establish context, then the freshly captured session id takes over.
 
 import { setTimeout as sleep } from "node:timers/promises";
-import { kimiAgent, parseSchemaResult } from "./kimiAgent.js";
+import { kimiAgent, parseSchemaResult, strictifySchema } from "./kimiAgent.js";
 import { resolveModel } from "./modelMap.js";
 import { loadAgentType } from "./agentTypes.js";
 import { estimateTokens } from "./meter.js";
@@ -161,9 +161,12 @@ export class KimiSessionDriver {
       this._runAgent(fullPrompt, {
         cwd: this.cwd,
         model: turnOpts.model ?? this.model,
-        systemPrompt: null, // already baked into fullPrompt
-        schema: turnOpts.schema,
-        effort: turnOpts.effort,
+        // systemPrompt/schema/effort are already baked into fullPrompt by
+        // _buildPrompt — do NOT pass them down, or kimiAgent would embed the
+        // schema/effort a second time AND parse the schema result itself
+        // (returning an object this driver's parseSchemaResult would choke on).
+        // The driver owns prompt construction and result parsing for its turns.
+        systemPrompt: null,
         timeoutMs: turnOpts.timeoutMs ?? DEFAULT_TURN_TIMEOUT_MS,
         onProgress: turnOpts.onProgress,
         log: this._log,
@@ -243,9 +246,11 @@ export class KimiSessionDriver {
     if (effort) parts.push(`(thinking effort: ${effort})`);
     parts.push(typeof prompt === "string" ? prompt : JSON.stringify(prompt));
     if (schema) {
+      // Same strict normalization as one-shot agent() turns (kimiAgent.buildFullPrompt),
+      // so a session turn's schema prompt is byte-for-byte the same contract.
       parts.push(
         "\n\nRespond with a single JSON object matching this schema (no extra prose, no markdown fences):\n" +
-        JSON.stringify(schema, null, 2),
+        JSON.stringify(strictifySchema(schema), null, 2),
       );
     }
     return parts.join("\n\n");

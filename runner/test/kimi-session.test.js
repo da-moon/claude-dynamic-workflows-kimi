@@ -123,13 +123,22 @@ try {
     assert.match(outcome.error, /boom/);
   }
 
-  // 6) Schema prompts return parsed JSON.
+  // 6) Schema prompts return parsed JSON. The driver owns the schema contract:
+  //    the schema is STRICTIFIED and embedded in the prompt (parity with one-shot
+  //    agent() turns) and is NOT forwarded to the runAgent seam — the real
+  //    kimiAgent would otherwise embed it a second time and pre-parse the result
+  //    into an object, which the driver's own parseSchemaResult pass would choke on.
   {
     resetFake(['{ "answer": 42 }']);
     const driver = new KimiSessionDriver({ model: "kimi-k2", systemPrompt: "sys", cwd: process.cwd(), runAgent: fakeKimiAgent });
-    const outcome = await (await driver.beginTurn("schema", { schema: { type: "object", properties: { answer: { type: "integer" } } } })).completion;
+    const outcome = await (await driver.beginTurn("schema", { schema: { type: "object", properties: { answer: { type: "integer" } } }, effort: "high" })).completion;
     assert.equal(outcome.status, "completed");
     assert.deepEqual(outcome.result, { answer: 42 });
+    assert.match(fakeCalls[0].prompt, /"required":\s*\[\s*"answer"\s*\]/, "the embedded schema is strictified (required filled in)");
+    assert.match(fakeCalls[0].prompt, /"additionalProperties":\s*false/, "the embedded schema is strictified (additionalProperties:false)");
+    assert.match(fakeCalls[0].prompt, /\(thinking effort: high\)/, "effort is embedded in the prompt");
+    assert.equal(fakeCalls[0].opts.schema, undefined, "schema is embedded by the driver, never forwarded to the agent seam");
+    assert.equal(fakeCalls[0].opts.effort, undefined, "effort is embedded by the driver, never forwarded to the agent seam");
   }
 
   // 7) startKimiSession with replayPrefix rebuilds the transcript for warm resume:
