@@ -79,7 +79,17 @@ function parseArgs(argv) {
     else if (a === "--summary") out.summary = true;
     else if (a === "--no-summary") out.noSummary = true;
     else if (a === "-h" || a === "--help") out.help = true;
-    else if (!out.script) out.script = a;
+    else if (a.startsWith("-")) {
+      // An unknown flag is never silently swallowed (and never becomes the
+      // script path): a typo'd safety flag or a skill-mode keyword (--multi)
+      // must fail loudly, not change what runs.
+      console.error(`run-workflow: unknown flag '${a}' (run with --help for the flag list)`);
+      process.exit(1);
+    } else if (!out.script) out.script = a;
+    else {
+      console.error(`run-workflow: unexpected argument '${a}' (script already given: '${out.script}')`);
+      process.exit(1);
+    }
   }
   return out;
 }

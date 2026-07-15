@@ -75,7 +75,7 @@ Read the mode from the user's phrasing, then behave accordingly:
 | Mode | Trigger | Behavior |
 |------|---------|----------|
 | **default** (rough-intent) | 1–2 rough sentences | Compile internally → author → run. State assumptions. |
-| **`--multi`** (fleet) | the `--multi` flag, or "fleet" / "several workflows at once" | Compile a **fleet plan** (2–4 concurrent variant workflows, similar and/or diverse), launch them in the background, and **supervise**: poll `fleet status`, answer gates, steer, kill, fork, then synthesize. See *Fleet mode*. |
+| **`--multi`** (fleet) | the `--multi` flag, or "fleet" / "several workflows at once" | Compile a **fleet plan** (2–4 concurrent variant workflows, similar and/or diverse), launch them in the background, and **supervise**: poll `fleet status`, answer gates, steer, kill, fork, then synthesize. See *Fleet mode*. (`--multi` is a skill-mode keyword, **not** a `run-workflow` flag — the runner rejects unknown flags.) |
 | **`prompt-only`** | "prompt-only", "just the invocation", "don't run it" | Emit a complete `/kimi-workflows` invocation/spec (the A–L structure below) and **STOP** — do not author or run. |
 | **`write-only`** | "write it but don't run", "author only" | Author the workflow script, print its path, stop before running. |
 | **`run-existing`** | a script path or saved-workflow name is given | Skip compilation; run that script/name through the runner. |
@@ -665,7 +665,7 @@ run-workflow <script.js>
   --sandbox S      read-only | workspace-write | danger-full-access  (default workspace-write)
   --budget N       token ceiling backing budget.total / budget.remaining()
   --budget-meter M what budget.spent() counts: total (default) | output (native pool)
-  --plan           dry run: count agents per phase/effort + estimate a --budget (no tokens)
+  --plan           dry run: count agents per phase/effort + estimate a --budget (no tokens; alias --dry-run)
   --tui            open a LIVE ASCII map of the run in a new terminal window
   --gui            open a LIVE HTML viewer of the run in your browser (--monitor = both)
   --interactive    enable the human() answer channel headlessly — answered via
@@ -678,7 +678,12 @@ run-workflow <script.js>
   --retries N      transient-error retries per agent (default 3)
   --resume         reuse prior results from the journal (skip unchanged agents)
   --journal PATH | --fresh | --no-journal
+  --summary        print the full cost/performance report at the end (a short one
+                   is printed automatically; --no-summary silences it)
 ```
+
+Unknown flags are rejected with an error (exit 1) — the runner never guesses.
+(`--multi` is skill-mode vocabulary, not a runner flag; don't forward it.)
 
 - **Live monitoring (`--tui` / `--gui`)** — when the user wants to *watch* the run,
   add `--tui` and/or `--gui`. The runner auto-opens a live monitor that tracks the
