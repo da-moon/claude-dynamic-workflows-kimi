@@ -1,13 +1,13 @@
 ---
 name: kimi-workflows
-disable-model-invocation: true
 description: >-
   From Claude Code, run a dynamic-workflow script via headless Kimi CLI prompts --
   orchestrate many Kimi agents (the agent / parallel / pipeline / phase / budget DSL)
   for codebase audits, large migrations, and multi-agent review or research.
-  Give it one or two rough sentences and it compiles the right harness for you;
-  add --multi for a supervised fleet of concurrent workflows.
-  Manual-invoke only via /kimi-workflows.
+  Use when the user wants multi-agent Kimi orchestration, a Kimi fan-out, a Kimi
+  fleet, or a task run as a Kimi workflow. Give it one or two rough sentences and
+  it compiles the right harness for you; add --multi for a supervised fleet of
+  concurrent workflows. Also invocable directly via /kimi-workflows.
 ---
 
 # Kimi Workflows
@@ -16,19 +16,23 @@ From **Claude Code**, run a dynamic-workflow script via **headless Kimi CLI prom
 The authoring surface is identical to native Claude Code dynamic workflows — `export const
 meta` plus a body using `agent()`, `parallel()`, `pipeline()`, `phase()`,
 `log()`, `args`, `budget`, `workflow()` — but every `agent()` call runs as one
-Kimi (GPT) thread+turn instead of a Claude subagent.
+headless Kimi CLI turn instead of a Claude subagent.
 
-**Manual-invoke only.** Claude Code does not auto-trigger this skill
-(`disable-model-invocation: true`); it runs only when the user types
-`/kimi-workflows` or explicitly asks for a Kimi workflow. Once invoked, follow
-the loop below — the work runs on Kimi/GPT agents. If the user actually wanted
-Claude subagents, say so and point them at the native Workflow tool.
+**When to invoke.** Claude Code may auto-trigger this skill whenever the user
+asks for multi-agent Kimi orchestration — a Kimi fan-out, a Kimi fleet, "run
+this as a Kimi workflow" — and the user can always invoke it explicitly with
+`/kimi-workflows`. Once invoked, follow the loop below — the work runs on Kimi
+agents. If the user actually wanted Claude subagents, say so and point them at
+the native Workflow tool.
 
-`RUNNER` below means the bundled runner directory: **`runner/` relative to this
-skill's base directory** (shown when the skill loads). For a classic skills-dir
-install that is `~/.claude/skills/kimi-workflows/runner` — the literal paths in
-the examples below assume it; substitute your base directory if this skill is
-installed as a plugin. It is dependency-free Node ≥ 18.
+`RUNNER` below means the bundled runner directory: **`runner/` inside this
+skill's install directory**. Every command below reaches it through the
+`CLAUDE_SKILL_DIR` substitution variable (written in its dollar-brace form):
+Claude Code replaces it inline when the skill loads with the absolute directory
+containing this SKILL.md, under **both** install shapes — the marketplace
+(plugin-cache) install and a skills-dir clone
+(`~/.claude/skills/kimi-workflows`) — so the commands work as written for
+either install. The runner is dependency-free Node ≥ 18.17.
 
 ## Default rough-intent mode
 
@@ -56,13 +60,15 @@ Operating rules in this mode:
 
 Every run, in order (the sections below expand each step):
 
-1. **Preflight** Kimi once (`handshake.js`); note the latest frontier model.
+1. **Preflight** Kimi once (`handshake.js`); note the frontier pick (the
+   strongest configured model).
 2. **Compile** the rough intent: classify the job → scale → archetype → pattern
    (name the failure mode it prevents) → task contract. **State your assumptions.**
 3. **Author** the script into the repo (`./<name>.workflow.js`).
 4. **Settings:** `--frontier` · effort by scale (`--effort medium` for a
-   `quick_harness`, `--auto-effort` for `standard`/`deep`) · `--sandbox read-only`
-   unless it must write · a bounded `--budget` · strict schemas (`additionalProperties:false`).
+   `quick_harness`, `--auto-effort` for `standard`/`deep`) · a bounded `--budget`
+   · strict schemas (`additionalProperties:false`). Runs are **full-auto** —
+   `--sandbox` only labels intent (see *Run defaults → Sandbox & permissions*).
 5. **Size it** — run `--plan` first for any expensive or complex workflow.
 6. **Run** on the Kimi runner (never the native `Workflow` tool).
 7. **Surface** — inline ASCII map + `summarize-run` highlights; cite the script,
@@ -81,7 +87,7 @@ Read the mode from the user's phrasing, then behave accordingly:
 | **`run-existing`** | a script path or saved-workflow name is given | Skip compilation; run that script/name through the runner. |
 | **`quick`** | "quick", "small", "cheap" | Bias to a `quick_harness` (2–5 agents). |
 | **`deep`** | "deep", "thorough", "exhaustive" | Allow a larger / `deep_harness`; justify the size. |
-| **`no-write`** | "don't write files", "just tell me" | Return final JSON/Markdown only; no report/source files; `--sandbox read-only`. |
+| **`no-write`** | "don't write files", "just tell me" | Return final JSON/Markdown only; no report/source files; instruct every agent not to write (and label the run `--sandbox read-only` — advisory, not enforced). |
 
 Two precedence rules: if the user gives a **script path or saved name**, run it
 (don't recompile). If the user gives a **detailed spec**, honor it as written but
@@ -102,15 +108,15 @@ are unchanged; steps 2 and 4 are where rough intent gets compiled.
 1. **Preflight** — once per session, or whenever a run fails to connect, confirm
    Kimi is reachable and authed:
    ```bash
-   node ~/.claude/skills/kimi-workflows/runner/test/handshake.js
+   node "${CLAUDE_SKILL_DIR}/runner/test/handshake.js"
    ```
-   It prints `state: ready` and the available models. If it fails, tell the user
-   to run `kimi login` (the runner needs a logged-in `kimi` CLI on PATH).
-   From that list, note the **latest frontier model** — the newest flagship
-   general model (not a `-mini`/`-spark` variant; `model/list` flags it
-   `isDefault` and its description calls it the strongest). The GPT-5.6 Kimi
-   series is Sol (flagship), Terra (balanced), and Luna (efficient); today the
-   frontier is `gpt-5.6-sol`. Every agent in the run uses it (see *Model*).
+   It prints `state: ready`, the **configured** models (from `kimi provider
+   list --json` — the only ids `--model` accepts), the **frontier pick**, and
+   the result of one minimal model-pinned live turn (pass `--offline` to skip
+   that turn). If it fails, tell the user to run `kimi login` (the runner needs
+   a logged-in `kimi` CLI on PATH). The frontier pick is the strongest
+   *configured* model — e.g. `kimi-code/kimi-for-coding` on a standard install —
+   and every agent in the run uses it (see *Model*).
 
 2. **Compile** the rough intent into a workflow (see *Compiling rough intent into a
    workflow*): classify the job → pick the scale → pick the archetype → pick the
@@ -125,17 +131,18 @@ are unchanged; steps 2 and 4 are where rough intent gets compiled.
 
 4. **Choose run settings** (see *Run defaults*): `--frontier`, the effort flag for
    the chosen scale (`--auto-effort` for a standard/deep harness, `--effort medium`
-   for a quick one), a read-only sandbox unless the run must write, and a bounded
-   `--budget`. For an expensive or complex workflow, **`--plan` first** — a no-token
-   dry run that counts agents per phase/effort and estimates a `--budget`.
+   for a quick one), and a bounded `--budget`. Runs execute **full-auto**; a
+   `--sandbox` value only labels intent (see *Run defaults → Sandbox &
+   permissions*). For an expensive or complex workflow, **`--plan` first** — a
+   no-token dry run that counts agents per phase/effort and estimates a `--budget`.
 
 5. **Run** it — **always pass `--frontier`**, plus the effort flag for the chosen
    scale: `--auto-effort` for a standard/deep harness (it scales each agent's effort
    to its layer's parallel width, so lone synthesis/judge gates think hardest), or
    `--effort medium` for a quick harness (see *Effort*). `--frontier` pins every
-   agent to the latest frontier model (see *Model*):
+   agent to the strongest configured model (see *Model*):
    ```bash
-   node ~/.claude/skills/kimi-workflows/runner/bin/run-workflow.js <script.js> --frontier --auto-effort [other flags]
+   node "${CLAUDE_SKILL_DIR}/runner/bin/run-workflow.js" <script.js> --frontier --auto-effort [other flags]
    #   quick_harness:  … <script.js> --frontier --effort medium [other flags]
    ```
    Progress streams on **stderr**; the workflow's return value prints as JSON on
@@ -148,7 +155,7 @@ are unchanged; steps 2 and 4 are where rough intent gets compiled.
    mention the script path, and **render the run's ASCII map inline in this
    conversation** so they see the execution graph natively (no window to open):
    ```bash
-   node ~/.claude/skills/kimi-workflows/runner/bin/map-run.js --journal <journal> --no-color
+   node "${CLAUDE_SKILL_DIR}/runner/bin/map-run.js" --journal <journal> --no-color
    ```
    (`<journal>` is the path the run logged as `✎ journal: …`, default
    `.workflow-journal/<name>.jsonl`.) Paste that output into your reply inside a
@@ -196,7 +203,8 @@ each bets on, per-run budgets) before launching. Two axes, freely mixed:
 
 Split the user's overall budget across variants (status shows each run's
 spend against its ceiling). **Size read-heavy fan-outs realistically using the
-existing GPT-5.5 measurements:** an
+measurements below (taken on the original GPT-5.5 backend — order-of-magnitude
+guidance on Kimi):** an
 agent whose job is *reading a repo/corpus* costs **~400–600k tokens
 regardless of its effort tier** — the input dominates, so `--effort low`
 does not make a sweep cheap, and `--plan`'s per-effort estimate undercounts
@@ -237,7 +245,7 @@ Launch each with `run_in_background`, **always with `--interactive`** (it
 enables the answer channel headlessly):
 
 ```bash
-node ~/.claude/skills/kimi-workflows/runner/bin/run-workflow.js hunt-orm.workflow.js \
+node "${CLAUDE_SKILL_DIR}/runner/bin/run-workflow.js" hunt-orm.workflow.js \
   --frontier --auto-effort --interactive --budget 1500000 1>hunt-orm.result.json
 # same script, different slice → isolate with --run-id:
 node …/run-workflow.js hunt.workflow.js --args '{"slice":"auth"}' --run-id auth --interactive …
@@ -252,7 +260,7 @@ polled (e.g. append `$WORKFLOW_EVENT` to a file you watch, or a macOS
 `osascript` notification):
 
 ```bash
-node ~/.claude/skills/kimi-workflows/runner/bin/fleet.js status <fleet-dir>   # --json to parse
+node "${CLAUDE_SKILL_DIR}/runner/bin/fleet.js" status <fleet-dir>   # --json to parse
 ```
 
 (When the *user* wants to watch alongside you, add `--watch` for an in-place
@@ -383,8 +391,8 @@ only when the job genuinely needs a worker to *keep its context across turns*:
 - the work is **one-shot** (a finding, a judgment, a synthesis);
 - **independent fresh-context review** is the point (review gates, adversarial verify
   — a steered worker carries bias forward);
-- the work is a **pure cacheable artifact** (sessions resume warm via
-  `thread/resume`, but one-shot replay never depends on a persisted rollout);
+- the work is a **pure cacheable artifact** (sessions resume warm by re-attaching
+  their persisted Kimi session, but one-shot replay never depends on one);
 - no follow-up steering is expected.
 
 **Compile, don't babysit.** When you author a sessionful workflow, the human sets
@@ -496,18 +504,30 @@ this section is the policy, not the reference):
 
 | Situation | Setting | Why |
 |-----------|---------|-----|
-| Always | the Kimi runner, **not** the native `Workflow` tool | routes work to Kimi/GPT, not Kimi subagents |
+| Always | the Kimi runner, **not** the native `Workflow` tool | routes work to Kimi agents, not Claude subagents |
 | Always | write the script into the repo | reproducible and rereadable |
 | Model | `--frontier` | one frontier model for every agent (see *Model*) |
 | Effort — `quick_harness` | `--effort medium` (or `--pin-effort medium`) | a small analytical run doesn't need layer-scaled effort; a flat, cheaper tier suffices |
 | Effort — `standard` / `deep` | `--auto-effort` | scales effort to layer width; lone synthesis/judge gates get `xhigh`, fan-outs floor at `high` |
-| Default sandbox | **`--sandbox read-only`** (pass it explicitly) | the runner's own default is `workspace-write` — don't rely on it |
-| Writing a report / running experiments / requested edits | `--sandbox workspace-write` | only when the run must write |
-| Never (unless explicitly requested **and** justified) | `--sandbox danger-full-access` | unsandboxed |
+| Permissions | **full-auto (unrestricted)** — the default; no flag needed | headless `kimi -p` auto-approves every tool action; the runner adds no gate (see *Sandbox & permissions* below) |
+| Intent label | `--sandbox read-only` (audits/research) · `workspace-write` (runs meant to write) | **advisory metadata only** — journaled (cache identity) and reported, never enforced |
 | Cost | a bounded `--budget`, sized via `--plan` | hard ceiling; `--plan` estimates it |
 | Expensive / complex run | **`--plan` first** | no-token dry run before the live run |
 | Structured output | JSON schemas with `additionalProperties: false` | strict and parseable |
 | After the run | viewer via `view-run.js --open`; summary via `summarize-run.js` or `--summary` | inspect cost / shape |
+
+**Sandbox & permissions.** Every agent turn is a headless `kimi -p` run, and
+headless Kimi **auto-approves every tool action** — reads, writes, shell
+commands. **Full-auto, unrestricted execution is the supported default** for
+workflow runs: the runner adds no permission gate of its own, and kimi 0.23.3
+exposes none for `-p` (it cannot even be combined with `--yolo`; a `-p` run is
+already unrestricted). The `--sandbox` flag and the per-call `sandbox` opt are
+**advisory metadata**: recorded in the journal (part of each agent's cache
+identity) and shown in run reports — useful for documenting intent — but not
+enforced. `--sandbox read-only` does **not** prevent writes. Mechanical
+enforcement is planned but not implemented; until then, put explicit read-only
+instructions in the prompts of agents that must not write, and point untrusted
+or exploratory runs at a disposable checkout/worktree.
 
 Three facts to encode correctly, since they're easy to get wrong:
 
@@ -526,21 +546,27 @@ JavaScript using only the injected globals (no imports / fs — agents do all I/
 
 ## Model: one frontier model for every agent
 
-Use a **single model — the latest frontier model — for every agent in the run.**
-Do not mix models, and do not downgrade "cheap" or "simple" stages to a smaller
-or older model. The GPT-5.6 Kimi series is **Sol** (flagship), **Terra**
-(balanced), and **Luna** (efficient). The frontier model is the newest flagship
-identified at preflight (`isDefault`; currently **`gpt-5.6-sol`**) — never
-`gpt-5.4`/`gpt-5.2` or a `-mini`/`-spark` variant.
+Use a **single model — the strongest configured model — for every agent in the
+run.** Do not mix models, and do not downgrade "cheap" or "simple" stages to a
+smaller model. Usable models are the ones **configured in the local Kimi CLI**
+(`kimi provider list --json`; e.g. `kimi-code/kimi-for-coding` and
+`kimi-code/kimi-for-coding-highspeed` on a standard install). The public
+discovery catalog (`kimi provider catalog list`) is *not* the usable set —
+passing an unconfigured catalog id to `--model` fails with `config.invalid`.
 
-Enforce it with **`--frontier`** (always pass it): the runner auto-detects the
-latest frontier model from `model/list` and pins **every** agent to it,
-**overriding any per-call `model`** a script sets. This is a hard guarantee — even
-if a script asks for `gpt-5.4`, `--frontier` forces it to the frontier and logs
-the override. (To pin a specific model instead, use `--pin-model gpt-5.6-sol`.)
+Enforce it with **`--frontier`** (always pass it): the runner picks the
+strongest configured model and pins **every** agent to it, **overriding any
+per-call `model`** a script sets. This is a hard guarantee — even if a script
+asks for `opus` or a Claude id, `--frontier` forces the frontier pick and logs
+the override. (To pin a specific model instead, use `--pin-model <configured
+id>`, e.g. `--pin-model kimi-code/kimi-for-coding` — it is validated against
+the configured set and the run fails fast, listing the configured ids, if the
+model isn't usable.)
 
 Also good practice, though `--frontier` makes it non-essential: don't set a
 per-call `model` in scripts — leave `model` out of every `agent()` opts object.
+When no model is set anywhere, the runner passes no `--model` flag and Kimi
+uses its own configured default.
 
 Need to bound cost? Lower effort (see below) and set `--budget` — do not switch models.
 
@@ -571,7 +597,10 @@ The floor is `high`; the policy never drops to `medium`. No per-agent bookkeepin
 
 Precedence (highest first): **`--pin-effort E`** (force every agent to `E`) →
 a script's **per-call `effort`** → **`--auto-effort`** layer policy → flat
-**`--effort E`** → inherited user config or model default. Because per-call
+**`--effort E`** → unset (no effort hint sent). On Kimi, effort is conveyed as
+a **prompt annotation** — the runner prepends `(thinking effort: E)` to the
+agent's prompt; there is no Kimi CLI/config reasoning-effort control, so treat
+the tiers as guidance the model follows, not a mechanical dial. Because per-call
 effort overrides the policy, **do not hand-set `effort` in scripts** — leave it out and let
 `--auto-effort` govern; reserve a per-call `effort` for a rare, deliberate
 exception (e.g. forcing `xhigh` on one unusually hard agent *inside* a wide
@@ -629,16 +658,23 @@ Globals:
   `.claude/workflows/` then `~/.claude/workflows/`.
 - `agent.start(prompt, opts?)` → an **`AgentSession`** (long-lived worker; returns
   before the turn finishes). `agent.waitAny(sessions, opts?)` → the first actionable
-  one. `session.steer(msg, {wait})` runs a follow-up turn **on the same thread**;
-  `session.wait/poll/cancel/close`. Sessions resume **warm** on `--resume`
-  (`thread/resume` re-attaches the persisted thread; completed turns replay free); use
+  one. `session.steer(msg, {wait})` runs a follow-up turn **on the same persisted
+  Kimi session** (`kimi -S <session id>` — only the new prompt is sent; prior
+  context, tool calls included, lives in the session); `session.wait/poll/cancel/close`
+  — `cancel()` genuinely interrupts the live turn (the kimi subprocess is
+  terminated; the worker's snapshot reads `cancelled`). Sessions resume **warm**
+  on `--resume` (completed turns replay free from the journal; follow-ups
+  re-attach to the persisted session via `-S`); use
   sessions for steerable/iterative work (see *4b · One-shot vs sessionful workers*).
 
-Key `agent()` opts: `schema` (JSON Schema → Kimi `outputSchema`, result parsed),
-`model` (Claude ids/aliases auto-map to a Kimi model), `agentType` (loads
-`.claude/agents/<name>.md` as the system prompt), `systemPrompt`, `effort`
+Key `agent()` opts: `schema` (JSON Schema, strictified and embedded in the
+prompt; the reply is parsed — `null` when the model doesn't comply, so
+`.filter(Boolean)`), `model` (Claude ids/aliases auto-map to a configured Kimi
+model), `agentType` (loads `.kimi/agents/<name>.md` or `.claude/agents/<name>.md`
+as the system prompt), `systemPrompt`, `effort`
 (usually omit — let `--auto-effort` scale it to layer width; see *Effort*),
-`sandbox` (`read-only` | `workspace-write` | `danger-full-access`), `isolation:
+`sandbox` (`read-only` | `workspace-write` | `danger-full-access` — **advisory
+metadata**: journaled and reported, not enforced), `isolation:
 'worktree'`, `cwd`, `personality`, `retries`, `label`, `phase` (group/attribute
 this agent — set it inside concurrent `pipeline`/`parallel` stages), `timeoutMs`.
 
@@ -656,13 +692,16 @@ ask many), `flaky-bug-perturbation` (hold + perturb live state), `hedged-take-fi
 ```
 run-workflow <script.js>
   --args JSON | --args-file PATH   value exposed to the script as `args`
-  --frontier       pin ALL agents to the auto-detected latest frontier model (recommended; overrides per-call model)
-  --pin-model M    pin ALL agents to model M (overrides per-call model)
+  --frontier       pin ALL agents to the strongest CONFIGURED model, auto-detected
+                   from `kimi provider list` (recommended; overrides per-call model)
+  --pin-model M    pin ALL agents to model M — validated against the configured
+                   set, fails fast if unusable (overrides per-call model)
   --model M        fallback model when not pinned; Claude ids/aliases auto-map
-  --effort E       none|minimal|low|medium|high|xhigh; flat fallback; unset → user config or model default
+  --effort E       none|minimal|low|medium|high|xhigh; flat fallback; unset → no effort hint sent
   --auto-effort    scale effort to layer width: 1→xhigh, 2+→high (floor) (recommended; overrides --effort)
   --pin-effort E   force ALL agents to effort E (overrides per-call effort)
-  --sandbox S      read-only | workspace-write | danger-full-access  (default workspace-write)
+  --sandbox S      read-only | workspace-write | danger-full-access — advisory intent
+                   label (journaled + reported, NOT enforced; agents run full-auto)
   --budget N       token ceiling backing budget.total / budget.remaining()
   --budget-meter M what budget.spent() counts: total (default) | output (native pool)
   --plan           dry run: count agents per phase/effort + estimate a --budget (no tokens; alias --dry-run)
@@ -699,13 +738,14 @@ Unknown flags are rejected with an error (exit 1) — the runner never guesses.
 - **Cost** — a run can spawn many agents and use real tokens. Keep the single
   frontier model (see *Model*) and bound cost with `--auto-effort` (already
   cheaper on wide layers) plus a `--budget` backstop — **not** by downgrading to a
-  smaller model. To squeeze further, `--pin-effort low`. Use `--sandbox read-only`
-  unless agents must edit files.
+  smaller model. To squeeze further, `--pin-effort low`. (`--sandbox` is an
+  advisory intent label, not a safety or cost lever — agents always run full-auto.)
 - **Sizing `--budget`** — it is a *hard ceiling that throws mid-run*, not an
   advisory: size it for the **whole fan-out**, not one agent. Run **`--plan`**
   first — a no-token dry run that counts agents per phase/effort and prints an
   estimated `--budget` (a lower bound for fan-outs sized from agent output).
-  Based on the existing GPT-5.5 measurements, a medium-effort frontier run spent
+  Based on measurements taken on the original GPT-5.5 backend (treat them as
+  order-of-magnitude guidance on Kimi), a medium-effort frontier run spent
   **~0.3–0.5M tokens/agent** (reasoning included), so an N-agent run wants
   `--budget ≈ N × 500k` with
   headroom. (A 35-agent run blew past an 8M ceiling after only ~17 agents.)
@@ -716,14 +756,13 @@ Unknown flags are rejected with an error (exit 1) — the runner never guesses.
   with a higher ceiling, and the cached agents replay at 0 tokens.
 - **Effort (important)** — prefer **`--auto-effort`**, which sets each agent's
   effort from its layer's parallel width (1→`xhigh`, 2+→`high`; the floor is
-  `high`; see *Effort*). Otherwise the runner only sends an effort when you set one (per-call
-  `effort` or `--effort`); when **nothing** is set, each agent inherits an explicit
-  `model_reasoning_effort` from the user's Kimi config, or the selected model's
-  catalog default when that setting is absent. GPT-5.6 Sol's catalog default is
-  `low`, so unspecified effort does **not** universally mean `xhigh`. For any
-  multi-agent run, pass
-  `--auto-effort` (best) or at least a flat `--effort`; never leave effort
-  unspecified.
+  `high`; see *Effort*). On Kimi, effort is a **prompt annotation**: the runner
+  prepends `(thinking effort: E)` to the agent's prompt when an effort is set,
+  and sends nothing when it isn't — there is no user-config or model-catalog
+  default to inherit, and no mechanical reasoning-effort control. It's guidance
+  the model follows, not a hard dial, so the `--plan` per-effort token
+  estimates are heuristic. For any multi-agent run, pass `--auto-effort` (best)
+  or at least a flat `--effort`.
 - **Resume** — every run journals each completed `agent()` result. If a run is
   interrupted or trips `--budget`, rerun with `--resume` (and the **same**
   model + effort flags + sandbox) — completed agents return from cache (0 tokens)
@@ -735,13 +774,15 @@ Unknown flags are rejected with an error (exit 1) — the runner never guesses.
 
 - **Isolation** — the script runs in a locked-down `node:vm` context: it can only
   coordinate agents, with no `process`/`fetch`/`require`/`import()`/`fs`/timers.
-  The *agents* do all file/command I/O (via the Kimi sandbox). Don't write a
-  script that tries to read files itself — have an `agent()` do it.
+  The *agents* do all file/command I/O — running **full-auto** (headless Kimi
+  auto-approves every tool action; see *Run defaults → Sandbox & permissions*).
+  Don't write a script that tries to read files itself — have an `agent()` do it.
 - **Model mapping** — a script that requests `claude-opus-4-8` or a bare
-  `opus`/`sonnet`/`haiku` maps Opus → Sol, Sonnet → Terra, and Haiku → Luna when
-  those GPT-5.6 Kimi tiers are available, with an available-model fallback.
-  Don't rely on that: pin every agent with `--frontier` (or
-  `--pin-model gpt-5.6-sol`) — see
+  `opus`/`sonnet`/`haiku` maps to a **configured** Kimi model: opus/sonnet →
+  `kimi-code/kimi-for-coding`, haiku → `kimi-code/kimi-for-coding-highspeed`
+  (first configured preference wins; bare configured names like
+  `kimi-for-coding` also resolve). Don't rely on that: pin every agent with
+  `--frontier` (or `--pin-model <configured id>`) — see
   *Model*. (`--model` is only the *fallback* default; a per-call `model` in the
   script overrides it, so it does NOT guarantee one model for every agent.)
 - **Determinism** — `Math.random()`, `Date.now()`, and argless `new Date()` are
@@ -750,7 +791,7 @@ Unknown flags are rejected with an error (exit 1) — the runner never guesses.
   finish within **600s** (`kimiAgent.js` default; raise it per-call with
   `timeoutMs` for a heavy agent). A single *monolithic* agent — huge input + long
   output + a file write — is the usual culprit and trips
-  `Timed out waiting for app-server notification`. Two takeaways: (1) split heavy
+  `Kimi prompt timed out after <N>ms`. Two takeaways: (1) split heavy
   synthesis/report stages or bump their `timeoutMs`; (2) a timed-out/"failed" run
   may have **already written files and journaled completed agents** — inspect the
   workspace and `.workflow-journal/<name>.jsonl` *before* redoing work, then
@@ -790,14 +831,14 @@ Every completed run leaves a journal at `<project>/.workflow-journal/<name>.json
 To inspect it as a polished GUI, generate a self-contained HTML viewer:
 
 ```bash
-node ~/.claude/skills/kimi-workflows/runner/bin/view-run.js <project-dir> --open
+node "${CLAUDE_SKILL_DIR}/runner/bin/view-run.js" <project-dir> --open
 ```
 
 For a terminal-native view (no browser), render the run as an **ASCII map** —
 add `--watch` to redraw it live as the run progresses:
 
 ```bash
-node ~/.claude/skills/kimi-workflows/runner/bin/map-run.js <project-dir> [--watch]
+node "${CLAUDE_SKILL_DIR}/runner/bin/map-run.js" <project-dir> [--watch]
 ```
 
 It auto-finds the journal and the `*.workflow.js` script in that dir (or pass
@@ -841,7 +882,7 @@ run cost, where the time and tokens went, and whether anything looks off — poi
 `summarize-run` at the journal (or run dir):
 
 ```bash
-node ~/.claude/skills/kimi-workflows/runner/bin/summarize-run.js <project-dir>
+node "${CLAUDE_SKILL_DIR}/runner/bin/summarize-run.js" <project-dir>
 #   --json        structured (the summary object)        --markdown   paste-ready
 #   --out PATH    write to a file                         --include-result  preview the return value
 ```
