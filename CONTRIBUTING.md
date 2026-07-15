@@ -21,14 +21,19 @@ Thanks for your interest! This is a small, dependency-free project -- easy to ha
 
 ## Develop
 
-No build step. Requires Node \u2265 18.
+No build step. Requires Node >= 18.17 (CI runs the maintained LTS lines, 20 and 24).
 
 ```bash
-npm test            # offline unit checks + viewer robustness (no Kimi, no network)
+npm test            # full offline suite via runner/test/all.js (no Kimi, no network)
 npm run doctor      # check that Kimi CLI is reachable and logged in
 npm run demo        # open the bundled sample run in the viewer
 npm run sync-skill  # push your working tree to ~/.claude/skills/kimi-workflows
 ```
+
+The suite list lives in one place: `runner/test/all.js` globs every
+`runner/test/*.test.js` (plus `offline.js`), and `npm test` -- at the root, in
+`runner/`, and in CI -- runs that. Drop a new `*.test.js` file in `runner/test/`
+and it runs everywhere automatically; keep it offline (no Kimi, no network).
 
 If you touch `runner/bin/view-run.js`, run `npm test` -- `view-run.test.js` renders
 every run shape (flat, large fan-out, pipeline, single, mixed, empty, scripted) in a
