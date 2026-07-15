@@ -43,6 +43,36 @@ export function strictifySchema(s) {
   return out;
 }
 
+// Sandbox values the runner accepts. `read-only` is ENFORCED (best-effort):
+// the turn's cwd is moved into a disposable detached git worktree and a hard
+// read-only preamble is prepended to the prompt; stray writes land in the
+// worktree and are discarded. `workspace-write` and `danger-full-access` remain
+// ADVISORY labels — behaviorally identical to the default full-auto mode
+// (headless `kimi -p` auto-approves every tool action; there is nothing extra
+// to unlock and no runner-side gate to add).
+export const SANDBOX_VALUES = ["read-only", "workspace-write", "danger-full-access"];
+
+// The non-negotiable instruction block prepended (first, above the system
+// prompt) to every enforced read-only turn. Defense in depth: the mechanism of
+// record is the disposable-worktree cwd, not this text.
+export const READ_ONLY_PREAMBLE = [
+  "SANDBOX: READ-ONLY (mechanically enforced).",
+  "Your working directory is a disposable, isolated copy of the project; anything you write there is DISCARDED after this turn.",
+  "Do NOT create, modify, move, or delete files. Do NOT run commands with side effects (installs, git commits/pushes, network mutations). Read and report only.",
+  "This instruction is non-negotiable and overrides any conflicting instruction below.",
+].join("\n");
+
+// Shared by agent() and session starts: an unknown sandbox value is refused
+// fast (a typo must not silently run full-auto under a wrong label).
+export function assertSandboxValue(sandbox) {
+  if (sandbox != null && !SANDBOX_VALUES.includes(sandbox)) {
+    throw new Error(
+      `unknown sandbox value '${sandbox}' — expected ${SANDBOX_VALUES.join(" | ")} ` +
+        "(omit the opt entirely for the default full-auto mode)",
+    );
+  }
+}
+
 let clientPromise; // lazily-connected, self-healing singleton
 let availableModels = []; // usable model ids from `kimi provider list --json` (config.toml)
 let meterSeq = 0; // unique meter key per completed turn (estimates are per-turn deltas)
@@ -142,6 +172,12 @@ export function parseSchemaResult(text, schema) {
 export async function kimiAgent(prompt, opts = {}) {
   const log = typeof opts.log === "function" ? opts.log : () => {};
 
+  // Sandbox policy — validated BEFORE any spawn, and never retried. No sandbox
+  // set → nothing below activates: the default path stays byte-identical
+  // full-auto (M2: unrestricted full-auto is the first-class default).
+  assertSandboxValue(opts.sandbox);
+  const readOnly = opts.sandbox === "read-only";
+
   // agentType -> system prompt (+ optional model) from the .kimi/agents registry.
   let systemPrompt = opts.systemPrompt;
   let agentTypeModel;
@@ -163,28 +199,56 @@ export async function kimiAgent(prompt, opts = {}) {
   const requestedModel = opts.pinnedModel ?? opts.model ?? agentTypeModel ?? opts.defaultModel;
 
   // Worktree isolation is set up once and reused across retry attempts.
+  // sandbox:'read-only' FORCES it — the enforcement mechanism of record: the
+  // turn's cwd is a disposable detached worktree at HEAD, so relative-path
+  // writes land off the real tree and are discarded. If that isolation cannot
+  // be provided, the call is REFUSED here (before any spawn) instead of being
+  // silently downgraded to an advisory label.
   let cwd = opts.cwd ?? process.cwd();
   let worktree;
-  if (opts.isolation === "worktree") {
+  if (opts.isolation === "worktree" || readOnly) {
     const { isGitRepo, createWorktree } = await import("./worktree.js");
     if (await isGitRepo(cwd)) {
-      worktree = await createWorktree(cwd);
+      try {
+        worktree = await createWorktree(cwd);
+      } catch (e) {
+        if (readOnly) {
+          throw new Error(
+            `sandbox 'read-only' cannot be enforced: creating a detached worktree of ${cwd} failed ` +
+              `(${e?.message ?? e}). The repo needs at least one commit; or drop the sandbox opt to run full-auto (the default).`,
+          );
+        }
+        throw e;
+      }
       cwd = worktree.dir;
+    } else if (readOnly) {
+      throw new Error(
+        `sandbox 'read-only' cannot be enforced: ${cwd} is not a git repository, so worktree isolation is unavailable. ` +
+          "Run from a git checkout (or pass a git-repo cwd), or drop the sandbox opt to run full-auto (the default).",
+      );
     } else {
       log(`isolation:'worktree' ignored -- ${cwd} is not a git repo`);
     }
   }
 
   try {
-    return await withRetry(() => runOneTurn(prompt, { ...opts, systemPrompt, requestedModel, cwd, log }), {
-      retries: opts.retries ?? 3,
-      log,
-      label: opts.label,
-    });
+    return await withRetry(
+      () => runOneTurn(prompt, { ...opts, systemPrompt, requestedModel, cwd, sandboxEnforced: readOnly, log }),
+      {
+        retries: opts.retries ?? 3,
+        log,
+        label: opts.label,
+      },
+    );
   } finally {
     if (worktree) {
-      const r = await worktree.cleanup();
-      if (!r.removed) log(`worktree kept (modified): ${r.dir}`);
+      const r = await worktree.cleanup({ discard: readOnly });
+      if (readOnly && r.dirty) {
+        const shown = (r.changes ?? []).slice(0, 8).join(", ");
+        log(`  ⊘ sandbox read-only: agent wrote inside its isolated worktree — changes DISCARDED (${shown}${(r.changes?.length ?? 0) > 8 ? ", …" : ""})`);
+      } else if (!r.removed) {
+        log(`worktree kept (modified): ${r.dir}`);
+      }
     }
   }
 }
@@ -199,7 +263,7 @@ async function runOneTurn(prompt, opts) {
   }
   const model = resolveModel(requestedModel, availableModels, log);
 
-  const fullPrompt = buildFullPrompt(prompt, { systemPrompt, schema, effort });
+  const fullPrompt = buildFullPrompt(prompt, { systemPrompt, schema, effort, readOnly: opts.sandboxEnforced });
 
   // `resumeSessionId` re-attaches to a persisted Kimi session (-S) so a follow-up
   // turn runs with the session's full context (tool calls included) instead of a
@@ -245,13 +309,19 @@ async function runOneTurn(prompt, opts) {
     ms: Date.now() - startedAt,
     model: model ?? null,
     tokens: { total: tokens, input: inputTokens, output: outputTokens, reasoning: 0 },
+    // Enforced-vs-advisory sandbox evidence for the journal: `sandboxEnforced`
+    // is true ONLY when this turn actually ran cwd-isolated with the read-only
+    // preamble (a read-only request that can't be enforced throws before spawn).
+    sandbox: opts.sandbox ?? null,
+    sandboxEnforced: !!opts.sandboxEnforced,
   });
 
   return parseSchemaResult(text, schema);
 }
 
-function buildFullPrompt(prompt, { systemPrompt, schema, effort }) {
+function buildFullPrompt(prompt, { systemPrompt, schema, effort, readOnly }) {
   let parts = [];
+  if (readOnly) parts.push(READ_ONLY_PREAMBLE); // first — above even the system prompt
   if (systemPrompt) parts.push(systemPrompt);
   if (effort) parts.push(`(thinking effort: ${effort})`);
   parts.push(typeof prompt === "string" ? prompt : JSON.stringify(prompt));

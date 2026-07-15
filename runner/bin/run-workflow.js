@@ -130,6 +130,11 @@ if (opts.help || !opts.script) {
       "  --pin-effort E   force ALL agents to effort E, overriding per-call effort\n" +
       "  --budget-meter   what budget.spent() counts: total (input+output, default) or\n" +
       "                   output (generated+reasoning, the native pool)\n" +
+      "  --sandbox S      read-only → ENFORCED (each agent runs cwd-isolated in a\n" +
+      "                   disposable git worktree with a hard read-only preamble;\n" +
+      "                   refused fast when that isolation is unavailable).\n" +
+      "                   workspace-write | danger-full-access → advisory labels only.\n" +
+      "                   Omit the flag for the default: unrestricted full-auto.\n" +
       "  --plan           dry run: count agents per phase/effort and estimate a --budget,\n" +
       "                   without calling any model or spending tokens\n" +
       "  --summary        print the full cost/performance/reliability report at the end\n" +
@@ -241,6 +246,34 @@ if (pinnedEffort) console.error(`⊙ pinning all agents to effort: ${pinnedEffor
 else if (opts.autoEffort) {
   console.error("⊙ auto-effort: scaling by layer width (1→xhigh, 2+→high)");
   if (opts.effort) console.error("  note: --auto-effort governs effort; --effort is ignored");
+}
+
+// Sandbox policy. No --sandbox → nothing here activates and the default path is
+// untouched: full-auto, no gate, no preamble (that unrestricted mode is the
+// first-class default). With a value: validate the spelling up front, and refuse
+// an unhonorable `read-only` FAST — before journals, monitors, or any spawn —
+// since read-only is enforced via detached-worktree cwd isolation, which needs
+// a git repo. workspace-write / danger-full-access stay advisory labels.
+const SANDBOXES = new Set(["read-only", "workspace-write", "danger-full-access"]);
+if (opts.sandbox && !SANDBOXES.has(opts.sandbox)) {
+  console.error(`--sandbox: unknown value '${opts.sandbox}' (expected ${[...SANDBOXES].join("|")}; omit the flag for the default full-auto mode)`);
+  process.exit(1);
+}
+if (opts.sandbox && !opts.plan) {
+  if (opts.sandbox === "read-only") {
+    const { isGitRepo } = await import("../src/worktree.js");
+    if (!(await isGitRepo(process.cwd()))) {
+      console.error(
+        "--sandbox read-only: cannot be enforced here — the working directory is not a git repository, so\n" +
+          "detached-worktree isolation is unavailable. Run from a git checkout, or drop --sandbox to run\n" +
+          "full-auto (the default).",
+      );
+      process.exit(1);
+    }
+    console.error("⊘ sandbox read-only: ENFORCED — agents run cwd-isolated in disposable worktrees with a hard read-only preamble (best-effort: absolute paths can still escape)");
+  } else {
+    console.error(`⊘ sandbox ${opts.sandbox}: advisory label only (behavior is the default full-auto)`);
+  }
 }
 
 if (opts.budgetMeter !== "total" && opts.budgetMeter !== "output") {
@@ -364,6 +397,9 @@ if (!opts.noJournal) {
       autoEffort: opts.autoEffort,
       pinEffort: pinnedEffort,
       sandbox: opts.sandbox ?? null,
+      // enforced-vs-advisory, so summaries can report the sandbox label honestly:
+      // read-only is mechanically enforced; the other values are intent labels.
+      sandboxEnforcement: opts.sandbox ? (opts.sandbox === "read-only" ? "enforced" : "advisory") : null,
       pid: process.pid,
       startedAt: Date.now(),
       script: resolve(opts.script),

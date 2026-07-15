@@ -132,9 +132,10 @@ export function readResult(journalPath) {
 }
 
 // Optional run-level metadata, written once by the runner next to the journal:
-// {startedAt, budget, budgetMeter, model, autoEffort, pinEffort, sandbox}. Purely
-// informational — lets a post-hoc summary report budget usage and effort policy
-// that the journal alone can't carry. Absent for journal-only / older runs.
+// {startedAt, budget, budgetMeter, model, autoEffort, pinEffort, sandbox,
+// sandboxEnforcement ("enforced"|"advisory"|null)}. Purely informational — lets
+// a post-hoc summary report budget usage and effort/sandbox policy that the
+// journal alone can't carry. Absent for journal-only / older runs.
 export function runMetaPathFor(journalPath) {
   return journalPath.replace(/\.jsonl$/i, "") + ".meta.json";
 }
@@ -340,6 +341,12 @@ export function buildRunModel({ journalPath, scriptPath = null, runDir = null, t
       effort: e.effort ?? spec?.effort ?? null,
       tokens: typeof e.tokens === "number" ? e.tokens : null,
       ms: typeof e.ms === "number" ? e.ms : null,
+      // Per-agent sandbox honesty: `sandboxEnforced` is a journaled fact — true
+      // means the turn ran mechanically contained (cwd-isolated worktree +
+      // read-only preamble); false means the label was advisory; null means
+      // unknown (a journal that predates enforcement).
+      sandbox: e.sandbox ?? null,
+      sandboxEnforced: e.sandboxEnforced === true ? true : e.sandboxEnforced === false ? false : null,
       result: e.result,
     };
     // Sessionful worker turns: the runtime journals each turn under a

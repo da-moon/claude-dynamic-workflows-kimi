@@ -28,8 +28,14 @@ export async function isGitRepo(cwd) {
 
 /**
  * Create a detached worktree at HEAD of the repo containing `repoCwd`.
- * Returns { dir, cleanup }, where cleanup() removes the worktree if clean and
- * returns { removed, dir, dirty }.
+ * Returns { dir, cleanup }, where cleanup({ discard }) removes the worktree and
+ * returns { removed, dir, dirty, changes }.
+ *
+ * Default (`isolation:'worktree'` semantics): a DIRTY worktree is kept and its
+ * path reported, so an agent's work isn't silently thrown away.
+ * `discard:true` (enforced `sandbox:'read-only'` semantics): a dirty worktree is
+ * removed anyway — stray writes from a read-only agent are contained and
+ * dropped — with the touched paths returned in `changes` for reporting.
  */
 export async function createWorktree(repoCwd) {
   const root = await git(repoCwd, ["rev-parse", "--show-toplevel"]);
@@ -39,19 +45,22 @@ export async function createWorktree(repoCwd) {
 
   return {
     dir,
-    async cleanup() {
+    async cleanup({ discard = false } = {}) {
       let dirty = false;
+      let changes = [];
       try {
-        dirty = (await git(dir, ["status", "--porcelain"])).length > 0;
+        const porcelain = await git(dir, ["status", "--porcelain"]);
+        dirty = porcelain.length > 0;
+        if (dirty) changes = porcelain.split("\n").map((l) => l.slice(3)).filter(Boolean);
       } catch {}
-      if (dirty) return { removed: false, dirty: true, dir };
+      if (dirty && !discard) return { removed: false, dirty: true, dir, changes };
       try {
         await git(root, ["worktree", "remove", "--force", dir]);
       } catch {}
       try {
         await rm(base, { recursive: true, force: true });
       } catch {}
-      return { removed: true, dirty: false, dir };
+      return { removed: true, dirty, dir, changes };
     },
   };
 }

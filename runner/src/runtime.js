@@ -257,6 +257,12 @@ export function createRuntime({
         tokens: metrics?.tokens?.total ?? null,
         tokensOut: metrics?.tokens ? metrics.tokens.output + metrics.tokens.reasoning : null,
         ms: metrics?.ms ?? null,
+        // Enforced-vs-advisory sandbox, per agent. `sandboxEnforced` is only
+        // trusted when the seam REPORTED enforcement (metrics side channel) —
+        // absent evidence it honestly records false (advisory). No sandbox set
+        // → neither field is journaled (record() drops nulls).
+        sandbox: merged.sandbox ?? null,
+        sandboxEnforced: merged.sandbox ? (metrics?.sandboxEnforced ?? false) : null,
       });
     }
     return result;
@@ -369,7 +375,7 @@ export function createRuntime({
   // concurrency-slot accounting, budget/cap gating, lifecycle events, journaling,
   // and the latest snapshot. Exposes ONLY safe methods to the script (no client).
   class LiveAgentSession {
-    constructor({ id, driver, label, phase, reqModel, effort, replay = null }) {
+    constructor({ id, driver, label, phase, reqModel, effort, replay = null, sandbox = null }) {
       this.id = id;
       this.label = label;
       this.phase = phase;
@@ -377,6 +383,7 @@ export function createRuntime({
       this._reqModel = reqModel;
       this._replay = replay; // journaled completed turns (by index) — warm-context resume only
       this._effort = effort ?? null; // default effort for follow-up turns
+      this._sandbox = sandbox; // journaled per turn, with the driver's enforcement evidence
       this._status = "starting";
       this._turnCount = 0;
       this._completion = null; // current turn's settle promise (-> snapshot)
@@ -528,6 +535,8 @@ export function createRuntime({
             session: true, sessionId: this.id, turn: turnIndex, status: snapStatus,
             threadId: this._driver.threadId ?? null, promptHash: promptHash ?? null,
             prompt: prompt == null ? null : typeof prompt === "string" ? prompt : JSON.stringify(prompt),
+            sandbox: this._sandbox ?? null,
+            sandboxEnforced: this._sandbox ? this._driver.sandboxEnforced === true : null,
           });
         } catch {}
       }
@@ -633,7 +642,7 @@ export function createRuntime({
     }
 
     const replay = driver.resumed && replayPrefix ? replayPrefix : null;
-    const session = new LiveAgentSession({ id, driver, label, phase, reqModel, effort, replay });
+    const session = new LiveAgentSession({ id, driver, label, phase, reqModel, effort, replay, sandbox: merged.sandbox ?? null });
     openSessions.add(session);
     try {
       await session._beginTurn(prompt, { schema: opts.schema, effort, timeoutMs: opts.timeoutMs }, "start");

@@ -160,11 +160,14 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
   assert.equal(s.budget.basis, "all-in-journal", "no event sidecar → budget falls back to the all-in journal total");
   assert.match(renderSummaryText(s), /journaled all-in total/);
   assert.ok(codes(s, "warn").includes("budget-pressure"), "≥80% used -> warn");
-  assert.deepEqual(s.policy, { model: "gpt-5.5", autoEffort: true, pinEffort: null, sandbox: "read-only" });
+  // A pre-enforcement meta (no sandboxEnforcement field) reports its sandbox
+  // label as what it truly was: advisory.
+  assert.deepEqual(s.policy, { model: "gpt-5.5", autoEffort: true, pinEffort: null, sandbox: "read-only", sandboxEnforcement: "advisory" });
   const txt = renderSummaryText(s);
   assert.match(txt, /Budget\s+900k \/ 1\.0M total \(90% used · 100k left\)/);
   assert.match(txt, /Run policy/);
   assert.match(txt, /auto-effort/);
+  assert.match(txt, /sandbox read-only \(advisory\)/, "policy line labels the sandbox enforced-vs-advisory");
   ok("budget meta: usage section, pressure warning, run policy");
 }
 

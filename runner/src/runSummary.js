@@ -94,6 +94,12 @@ export function summarizeRun({ journalPath, scriptPath = null, runDir = null, ti
   const journaled = agents.length;
   const nullResults = agents.filter((a) => a.result == null && !isExpectedNull(a)).length;
   const completed = journaled - agents.filter((a) => a.result == null).length;
+  // Enforced-vs-advisory sandbox, per agent (journaled facts, not the run flag):
+  // enforced = the turn actually ran mechanically contained (worktree cwd +
+  // read-only preamble); everything else that carries a sandbox label is advisory.
+  const sandboxedAgents = agents.filter((a) => a.sandbox).length;
+  const sandboxEnforcedAgents = agents.filter((a) => a.sandbox && a.sandboxEnforced === true).length;
+  const sandboxAdvisoryAgents = sandboxedAgents - sandboxEnforcedAgents;
   const withTokens = agents.filter((a) => typeof a.tokens === "number").length;
   const withMs = agents.filter((a) => typeof a.ms === "number").length;
   const totalTokens = agents.reduce((s, a) => s + (a.tokens || 0), 0);
@@ -250,6 +256,12 @@ export function summarizeRun({ journalPath, scriptPath = null, runDir = null, ti
     const msg = `${defaultEffort} of ${journaled} agents ran with no explicit effort → they inherit the user's Kimi config or the model default. Use --auto-effort or --effort for predictable cost and behavior.`;
     (defaultEffort >= 4 || defaultEffort / journaled >= 0.5) ? warn("default-effort-cost", msg) : info("default-effort-cost", msg);
   }
+  // a 'read-only' label without enforcement evidence must not be trusted as
+  // containment: it comes from a pre-enforcement run or a cached replay.
+  const roUnenforced = agents.filter((a) => a.sandbox === "read-only" && a.sandboxEnforced !== true).length;
+  if (roUnenforced > 0) {
+    warn("unenforced-read-only", `${roUnenforced} agent(s) carry a 'read-only' sandbox label WITHOUT mechanical enforcement (pre-enforcement journal entries or cached replays) — treat that label as intent, not containment.`);
+  }
   // budget pressure
   if (budget && budget.fraction >= 0.8) {
     warn("budget-pressure", `Budget ${pct(budget.fraction)} used (${fmtTokens(budget.spent)} of ${fmtTokens(budget.total)} ${budget.meter} tokens)${budget.fraction >= 1 ? " — at or over the ceiling." : "."}`);
@@ -284,6 +296,9 @@ export function summarizeRun({ journalPath, scriptPath = null, runDir = null, ti
       cancelledTurns,
       failedTurns,
       interruptedTurns,
+      sandboxedAgents,
+      sandboxEnforcedAgents,
+      sandboxAdvisoryAgents,
     },
     sessions: sessions.map((w) => ({
       id: w.id, label: w.label, phase: w.phase, model: w.model || null,
@@ -300,7 +315,13 @@ export function summarizeRun({ journalPath, scriptPath = null, runDir = null, ti
     },
     budget,
     policy: meta
-      ? { model: meta.model ?? null, autoEffort: !!meta.autoEffort, pinEffort: meta.pinEffort ?? null, sandbox: meta.sandbox ?? null }
+      ? {
+          model: meta.model ?? null, autoEffort: !!meta.autoEffort, pinEffort: meta.pinEffort ?? null,
+          sandbox: meta.sandbox ?? null,
+          // "enforced" | "advisory" | null. Old metas predate enforcement — a
+          // sandbox label they carry was advisory by definition.
+          sandboxEnforcement: meta.sandbox ? (meta.sandboxEnforcement ?? "advisory") : null,
+        }
       : null,
     byPhase,
     byModel,
@@ -419,7 +440,8 @@ export function renderSummaryText(s, { includeResult = false } = {}) {
     if (p.model) bits.push("model " + p.model);
     if (p.autoEffort) bits.push("auto-effort");
     if (p.pinEffort) bits.push("pin-effort " + p.pinEffort);
-    if (p.sandbox) bits.push("sandbox " + p.sandbox);
+    if (p.sandbox) bits.push("sandbox " + p.sandbox + (p.sandboxEnforcement ? ` (${p.sandboxEnforcement})` : ""));
+    if (s.counts.sandboxedAgents) bits.push(`${s.counts.sandboxEnforcedAgents}/${s.counts.sandboxedAgents} agents sandbox-enforced`);
     if (bits.length) { L.push(""); L.push(section("Run policy")); L.push("  " + bits.join(" · ")); }
   }
 
@@ -519,7 +541,8 @@ export function renderSummaryMarkdown(s, { includeResult = false } = {}) {
     if (p.model) bits.push("model `" + p.model + "`");
     if (p.autoEffort) bits.push("auto-effort");
     if (p.pinEffort) bits.push("pin-effort `" + p.pinEffort + "`");
-    if (p.sandbox) bits.push("sandbox `" + p.sandbox + "`");
+    if (p.sandbox) bits.push("sandbox `" + p.sandbox + "`" + (p.sandboxEnforcement ? ` (${p.sandboxEnforcement})` : ""));
+    if (s.counts.sandboxedAgents) bits.push(`${s.counts.sandboxEnforcedAgents}/${s.counts.sandboxedAgents} agents sandbox-enforced`);
     if (bits.length) L.push("", "## Run policy", "", bits.join(" · "));
   }
   if (includeResult && s.result !== undefined) {

@@ -15,7 +15,7 @@
 // to re-establish context, then the freshly captured session id takes over.
 
 import { setTimeout as sleep } from "node:timers/promises";
-import { kimiAgent, parseSchemaResult, strictifySchema } from "./kimiAgent.js";
+import { kimiAgent, parseSchemaResult, strictifySchema, assertSandboxValue, READ_ONLY_PREAMBLE } from "./kimiAgent.js";
 import { resolveModel } from "./modelMap.js";
 import { loadAgentType } from "./agentTypes.js";
 import { estimateTokens } from "./meter.js";
@@ -55,22 +55,50 @@ export async function startKimiSession(opts = {}) {
   // pinnedModel is authoritative (forces every agent onto one model), same as agent().
   const requestedModel = opts.pinnedModel ?? opts.model ?? agentTypeModel ?? opts.defaultModel;
 
+  // Sandbox policy — same contract as agent(): validated up front, and a
+  // read-only request that can't be mechanically honored is REFUSED at start
+  // (never silently downgraded to an advisory label). Enforcement is
+  // session-level: the worktree cwd persists across every follow-up turn, and
+  // the read-only preamble rides the thread's system prompt (established on the
+  // first turn; persisted-session context carries it into -S resumes).
+  assertSandboxValue(opts.sandbox);
+  const readOnly = opts.sandbox === "read-only";
+  if (readOnly) {
+    systemPrompt = systemPrompt ? `${READ_ONLY_PREAMBLE}\n\n${systemPrompt}` : READ_ONLY_PREAMBLE;
+  }
+
   // Worktree isolation: created once, kept across every follow-up turn, removed
   // only by cleanup() (session.close / runtime finalization) -- never per-turn.
+  // sandbox:'read-only' forces it (the enforcement mechanism of record).
   let cwd = opts.cwd ?? process.cwd();
   let worktree;
-  if (opts.isolation === "worktree") {
+  if (opts.isolation === "worktree" || readOnly) {
     const { isGitRepo, createWorktree } = await import("./worktree.js");
     if (await isGitRepo(cwd)) {
-      worktree = await createWorktree(cwd);
+      try {
+        worktree = await createWorktree(cwd);
+      } catch (e) {
+        if (readOnly) {
+          throw new Error(
+            `sandbox 'read-only' cannot be enforced: creating a detached worktree of ${cwd} failed ` +
+              `(${e?.message ?? e}). The repo needs at least one commit; or drop the sandbox opt to run full-auto (the default).`,
+          );
+        }
+        throw e;
+      }
       cwd = worktree.dir;
+    } else if (readOnly) {
+      throw new Error(
+        `sandbox 'read-only' cannot be enforced: ${cwd} is not a git repository, so worktree isolation is unavailable. ` +
+          "Run from a git checkout (or pass a git-repo cwd), or drop the sandbox opt to run full-auto (the default).",
+      );
     } else {
       log(`isolation:'worktree' ignored -- ${cwd} is not a git repo`);
     }
   }
 
   const model = resolveModel(requestedModel, [], log);
-  const driver = new KimiSessionDriver({ model, systemPrompt, cwd, worktree, log, runAgent });
+  const driver = new KimiSessionDriver({ model, systemPrompt, cwd, worktree, log, runAgent, sandboxEnforced: readOnly });
 
   // Warm-context resume (--resume): a prior run journaled this worker's turns.
   // Preferred path: the journal recorded a REAL kimi session id (resumeThreadId)
@@ -113,11 +141,12 @@ export async function startKimiSession(opts = {}) {
 //     result, text, error, model, tokens, ms, turnId
 //   }
 export class KimiSessionDriver {
-  constructor({ model, systemPrompt, cwd, worktree, log, runAgent = kimiAgent }) {
+  constructor({ model, systemPrompt, cwd, worktree, log, runAgent = kimiAgent, sandboxEnforced = false }) {
     this.model = model ?? null;
     this.systemPrompt = systemPrompt ?? null;
     this.cwd = cwd ?? process.cwd();
     this._worktree = worktree;
+    this.sandboxEnforced = !!sandboxEnforced; // read-only worktree containment active for this session
     this._log = typeof log === "function" ? log : () => {};
     this._runAgent = runAgent;
     this._active = false;
@@ -268,11 +297,18 @@ export class KimiSessionDriver {
   }
 
   // Remove the worktree (if any) -- kept across all turns, removed only here.
+  // An enforced read-only session DISCARDS stray writes (that's the containment
+  // contract); an isolation:'worktree' session keeps a dirty worktree as before.
   async cleanup() {
     if (this._worktree) {
       try {
-        const r = await this._worktree.cleanup();
-        if (!r.removed) this._log(`worktree kept (modified): ${r.dir}`);
+        const r = await this._worktree.cleanup({ discard: this.sandboxEnforced });
+        if (this.sandboxEnforced && r.dirty) {
+          const shown = (r.changes ?? []).slice(0, 8).join(", ");
+          this._log(`  ⊘ sandbox read-only: session wrote inside its isolated worktree — changes DISCARDED (${shown}${(r.changes?.length ?? 0) > 8 ? ", …" : ""})`);
+        } else if (!r.removed) {
+          this._log(`worktree kept (modified): ${r.dir}`);
+        }
       } catch (e) {
         this._log(`worktree cleanup failed: ${e?.message ?? e}`);
       }
