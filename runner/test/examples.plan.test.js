@@ -22,7 +22,16 @@ const scripts = readdirSync(join(ROOT, "examples"), { recursive: true })
   .map((f) => join("examples", f))
   .sort();
 
-assert.ok(scripts.length >= 15, `expected the full template library, found ${scripts.length}`);
+// Exact count, on purpose: a floor let a third of the template library vanish
+// without failing CI. Adding or removing a bundled *.workflow.js under
+// examples/ must update this number in the same commit.
+const EXPECTED_WORKFLOWS = 24;
+assert.equal(
+  scripts.length,
+  EXPECTED_WORKFLOWS,
+  `expected exactly ${EXPECTED_WORKFLOWS} bundled workflows, found ${scripts.length}:\n  ${scripts.join("\n  ")}\n` +
+    "(added or removed a template? update EXPECTED_WORKFLOWS in this test)",
+);
 
 const failures = [];
 for (const script of scripts) {
