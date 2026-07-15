@@ -147,6 +147,34 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
   assert.match(hl, /Ship the live viewer/, "result node summarizes a headline result");
 }
 
+// 5e) Regression (issue #2): a persisted result whose headline lives one level
+// down (e.g. { merged: { verdict, summary } }) must render in the result box —
+// this used to fall through to "(no result)" although <name>.result.json existed.
+{
+  const dir = await mkdtemp(join(tmpdir(), "wf-res-nested-"));
+  const jdir = join(dir, ".workflow-journal");
+  await mkdir(jdir, { recursive: true });
+  const jf = join(jdir, "review.workflow.jsonl");
+  await writeFile(jf, [
+    JSON.stringify({ key: "a#0", label: "review:new-to-nix", result: { summary: "Prereqs missing." }, phase: "Review", model: "kimi-code", effort: "high", tokens: 40000, ms: 60000 }),
+    JSON.stringify({ key: "m#0", label: "merge", result: { summary: "Merged 4 reviews." }, phase: "Merge", model: "kimi-code", effort: "medium", tokens: 5000, ms: 30000 }),
+  ].join("\n"));
+  await writeFile(join(jdir, "review.workflow.result.json"),
+    JSON.stringify({ merged: { verdict: "ship-with-nits", summary: "README is accurate but assumes Nix fluency.", defects: [] } }));
+  const run = buildRunModel({ journalPath: jf, runDir: dir });
+  assert.ok(run.result && run.result.merged, "sidecar result loaded into run.result");
+  const s = plain(renderMap(run, { color: false, width: 80 }));
+  assert.match(s, /README is accurate but assumes Nix fluency\./, "result box summarizes the nested return value");
+  assert.doesNotMatch(s, /\(no result\)/, "never '(no result)' when the result sidecar exists");
+  await rm(dir, { recursive: true, force: true });
+
+  // and a result with NO extractable prose at all still renders honestly (compact
+  // JSON), never "(no result)".
+  const blob = plain(renderMap({ ...run, result: { ok: true, count: 4 } }, { color: false, width: 80 }));
+  assert.match(blob, /\{"ok":true,"count":4\}/, "unextractable result falls back to compact JSON");
+  assert.doesNotMatch(blob, /\(no result\)/);
+}
+
 // 6) time formatting rolls over correctly (119.6s → 2m00s, never 1m60s).
 {
   const run = {

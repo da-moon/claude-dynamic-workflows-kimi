@@ -68,7 +68,7 @@ const circled = (n) => CIRCLED[n] ?? `(${n})`;
 
 // One-line summary of a result value — a headline-ish field, the first prose line
 // of a Markdown report, or the first substantial string. Mirrors the HTML viewer.
-function summarizeValue(r) {
+function summarizeValue(r, depth = 0) {
   if (r == null) return "";
   if (typeof r === "string") return r.replace(/\s+/g, " ").trim();
   if (typeof r !== "object") return String(r);
@@ -79,14 +79,34 @@ function summarizeValue(r) {
     const line = r.reportMarkdown.split("\n").map((l) => l.trim()).find((l) => l && !l.startsWith("#"));
     if (line) return line.replace(/[*`]/g, "");
   }
-  return Object.values(r).find((v) => typeof v === "string" && v.length > 8) || "";
+  const snip = agentSnippet(r); // richer key list (summary, verdict, tldr, …)
+  if (snip) return snip;
+  const anyStr = Object.values(r).find((v) => typeof v === "string" && v.length > 8);
+  if (anyStr) return anyStr;
+  // Wrapper shapes like { merged: {...} } or [{...}]: the headline lives one
+  // level down. Recurse (bounded) before giving up.
+  if (depth < 2) {
+    for (const v of Object.values(r)) {
+      if (v && typeof v === "object") {
+        const inner = summarizeValue(v, depth + 1);
+        if (inner) return inner;
+      }
+    }
+  }
+  return "";
 }
 
 // Outcome summary for the result node: prefer the workflow's actual return value
 // (the honest result the runner persisted), then fall back to a heuristic "final
 // agent" result for journal-only runs that have no persisted return value.
 function outcomeSummary(run) {
-  if (run.result !== undefined && run.result !== null) return summarizeValue(run.result);
+  if (run.result !== undefined && run.result !== null) {
+    const s = summarizeValue(run.result);
+    if (s) return s;
+    // A persisted return value with no extractable headline is still a result —
+    // show it compactly rather than claiming "(no result)".
+    try { return JSON.stringify(run.result); } catch { return String(run.result); }
+  }
   const last = run.phases[run.phases.length - 1];
   const inLast = last ? run.agents.filter((a) => a.phase === last.title) : [];
   const fa = run.agents.find((a) => a.result && (a.result.recommended_direction || a.result.recommendation))
