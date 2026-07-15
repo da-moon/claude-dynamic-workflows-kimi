@@ -13,7 +13,8 @@
 //     "error: Cannot combine --prompt with --yolo." (headless -p already
 //     auto-approves everything, so those flags are both fatal and redundant)
 //   - the returned text is the LAST assistant line with string `content`;
-//     tool_calls lines, tool results, and the trailing meta line are ignored
+//     tool_calls lines and tool results are ignored, and the trailing
+//     `session.resume_hint` meta line only supplies the persisted session id
 //   - model ids come from `kimi provider list --json` -> `.models` keys, and
 //     aliases like "opus" resolve onto that configured set.
 

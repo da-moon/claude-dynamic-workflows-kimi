@@ -200,12 +200,29 @@ async function runOneTurn(prompt, opts) {
 
   const fullPrompt = buildFullPrompt(prompt, { systemPrompt, schema, effort });
 
-  const args = ["-p", fullPrompt, "--output-format", "stream-json"];
+  // `resumeSessionId` re-attaches to a persisted Kimi session (-S) so a follow-up
+  // turn runs with the session's full context (tool calls included) instead of a
+  // transcript re-send. Verified on kimi 0.23.3: `-S <id> -p` resumes
+  // non-interactively and the session_id stays stable across resumes.
+  const args = [];
+  if (opts.resumeSessionId) args.push("-S", opts.resumeSessionId);
+  args.push("-p", fullPrompt, "--output-format", "stream-json");
   if (model) args.push("--model", model);
 
   log?.(`  \u27ea kimi ${args.join(" ")} \u27eb`);
 
-  const result = await spawnKimi(args, { cwd, timeoutMs: opts.timeoutMs ?? 600_000, onProgress: opts.onProgress });
+  const result = await spawnKimi(args, {
+    cwd,
+    timeoutMs: opts.timeoutMs ?? 600_000,
+    onProgress: opts.onProgress,
+    signal: opts.signal,
+  });
+
+  // Every `kimi -p` run ends with a `session.resume_hint` meta line carrying the
+  // persisted session id. Surface it so sessionful callers can resume with -S.
+  if (result.sessionId && typeof opts.onSessionId === "function") {
+    try { opts.onSessionId(result.sessionId); } catch {}
+  }
 
   const text = result.text ?? "";
   const tokens = estimateTokens(fullPrompt) + estimateTokens(text);
@@ -233,7 +250,11 @@ function buildFullPrompt(prompt, { systemPrompt, schema, effort }) {
   return parts.join("\n\n");
 }
 
-function spawnKimi(args, { cwd, timeoutMs, onProgress }) {
+// Spawn one `kimi` prompt subprocess. `signal` (an AbortSignal) is the kill
+// handle for cancellation: on abort the child is SIGTERMed and the promise
+// rejects with an error tagged `interrupted: true`, which session drivers map to
+// an "interrupted" turn outcome (never retried).
+function spawnKimi(args, { cwd, timeoutMs, onProgress, signal }) {
   return new Promise((resolve, reject) => {
     const child = spawn("kimi", args, {
       cwd,
@@ -244,6 +265,16 @@ function spawnKimi(args, { cwd, timeoutMs, onProgress }) {
     let stdout = "";
     let stderr = "";
     let timer;
+    let interrupted = false;
+
+    const onAbort = () => {
+      interrupted = true;
+      try { child.kill("SIGTERM"); } catch {}
+    };
+    if (signal) {
+      if (signal.aborted) onAbort();
+      else signal.addEventListener("abort", onAbort, { once: true });
+    }
 
     child.stdout.on("data", (chunk) => {
       const text = chunk.toString("utf8");
@@ -268,7 +299,10 @@ function spawnKimi(args, { cwd, timeoutMs, onProgress }) {
       stderr += chunk.toString("utf8");
     });
 
-    const cleanup = () => { if (timer) clearTimeout(timer); };
+    const cleanup = () => {
+      if (timer) clearTimeout(timer);
+      if (signal) signal.removeEventListener("abort", onAbort);
+    };
 
     if (timeoutMs > 0) {
       timer = setTimeout(() => {
@@ -282,31 +316,45 @@ function spawnKimi(args, { cwd, timeoutMs, onProgress }) {
       reject(err);
     });
 
-    child.on("exit", (code, signal) => {
+    child.on("exit", (code, sig) => {
       cleanup();
-      if (signal) {
-        return reject(new Error(`Kimi process killed by signal ${signal}; stderr=${stderr.slice(-400)}`));
+      if (interrupted) {
+        const err = new Error("Kimi turn interrupted (cancelled)");
+        err.interrupted = true;
+        return reject(err);
+      }
+      if (sig) {
+        return reject(new Error(`Kimi process killed by signal ${sig}; stderr=${stderr.slice(-400)}`));
       }
       if (code !== 0) {
         return reject(new Error(`Kimi exited with code ${code}; stderr=${stderr.slice(-400)}`));
       }
-      const text = extractFinalAssistantText(stdout);
-      resolve({ text, stderr: stderr.slice(-4000) });
+      const { text, sessionId } = parseStreamOutput(stdout);
+      resolve({ text, sessionId, stderr: stderr.slice(-4000) });
     });
   });
 }
 
-function extractFinalAssistantText(stdout) {
+// Parse a stream-json run's stdout: the returned `text` is the LAST assistant
+// line with string content; `sessionId` comes from the trailing
+// `session.resume_hint` meta line (the persisted-session id `-S` accepts).
+function parseStreamOutput(stdout) {
   const lines = stdout.split("\n").filter(Boolean);
+  let text = "";
+  let sessionId = null;
   for (let i = lines.length - 1; i >= 0; i--) {
     try {
       const obj = JSON.parse(lines[i]);
-      if (obj.role === "assistant" && typeof obj.content === "string") {
-        return obj.content;
+      if (!sessionId && obj.type === "session.resume_hint" && typeof obj.session_id === "string") {
+        sessionId = obj.session_id;
       }
+      if (!text && obj.role === "assistant" && typeof obj.content === "string") {
+        text = obj.content;
+      }
+      if (text && sessionId) break;
     } catch {}
   }
-  return "";
+  return { text, sessionId };
 }
 
 // ---- retry classification ----
@@ -323,10 +371,11 @@ const RETRYABLE_MSG =
   /(Transport is not connected|app-server exited|timed out|ECONNRESET|EPIPE|socket hang up|stream (disconnected|connection)|killed by signal|exited with code)/i;
 // Permanent, deterministic failures (checked BEFORE the retryable patterns):
 // misconfigured models (`config.invalid: Model "..." is not configured`), bad
-// flags, and impossible flag combinations ("Cannot combine --prompt with --yolo")
+// flags, impossible flag combinations ("Cannot combine --prompt with --yolo"),
+// and a `-S` resume of a session kimi no longer has (`Session "..." not found.`)
 // fail identically on every attempt — retrying only burns backoff time.
 const NONRETRYABLE_MSG =
-  /(BadRequest|Unauthorized|ContextWindowExceeded|invalid request|outputSchema|did not return|config\.invalid|is not configured|unknown option|Cannot combine)/i;
+  /(BadRequest|Unauthorized|ContextWindowExceeded|invalid request|outputSchema|did not return|config\.invalid|is not configured|unknown option|Cannot combine|Session ".*" not found)/i;
 
 function errorCode(e) {
   const ci = e?.kimiErrorInfo;
@@ -335,6 +384,7 @@ function errorCode(e) {
 }
 
 export function isRetryable(e) {
+  if (e?.interrupted) return false; // a cancelled turn must stay cancelled
   const code = errorCode(e);
   if (code) return RETRYABLE_CODES.has(code);
   const msg = String(e?.message ?? "");

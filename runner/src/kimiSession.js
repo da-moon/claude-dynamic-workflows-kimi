@@ -2,11 +2,17 @@
 // `agent.start()` / `session.steer()` API (the orchestration, budget, concurrency,
 // events and journaling live in runtime.js).
 //
-// Kimi CLI does not expose a lightweight persistent thread API like Codex's
-// `thread/resume`. In v1 we implement sessions by keeping the conversation
-// transcript and prepending it to each steer prompt. This is deterministic and
-// journal-resumable: on `--resume` we replay the cached completed turns by
-// rebuilding the transcript from the journal entries.
+// Sessions ride kimi's REAL persisted sessions (verified on kimi 0.23.3): every
+// `kimi -p` run ends with a `session.resume_hint` meta line carrying a stable
+// `session_<uuid>` id, and `kimi -S <id> -p` resumes that session non-interactively
+// with FULL context (tool calls included). The driver captures the id on the first
+// turn and passes `-S <id>` on every follow-up turn — prompts are never re-sent.
+//
+// The conversation transcript is still kept in memory, but ONLY as (a) the
+// journal-replay identity for `--resume` and (b) a context-rebuild fallback when
+// no resumable kimi session exists (a fake runAgent in tests, or a journaled
+// session kimi has since deleted): in that case one turn prepends the transcript
+// to re-establish context, then the freshly captured session id takes over.
 
 import { setTimeout as sleep } from "node:timers/promises";
 import { kimiAgent, parseSchemaResult } from "./kimiAgent.js";
@@ -15,6 +21,11 @@ import { loadAgentType } from "./agentTypes.js";
 import { estimateTokens } from "./meter.js";
 
 const DEFAULT_TURN_TIMEOUT_MS = 600_000;
+
+// Shape of the persisted-session ids kimi emits in `session.resume_hint` (the
+// only ids `-S` accepts). Old journals recorded synthetic `kimi-session-*` ids,
+// which kimi rejects — those must never be passed to `-S`.
+const KIMI_SESSION_ID_RE = /^session_[0-9a-fA-F-]+$/;
 
 /**
  * Open a Kimi session for a long-lived worker. Resolves the agentType/system
@@ -61,16 +72,33 @@ export async function startKimiSession(opts = {}) {
   const model = resolveModel(requestedModel, [], log);
   const driver = new KimiSessionDriver({ model, systemPrompt, cwd, worktree, log, runAgent });
 
-  // Warm-context resume: a prior run journaled this worker's transcript. Rebuild
-  // it so the next steer sees the previous turns. If no replay prefix exists the
-  // driver starts with an empty transcript.
-  if (opts.replayPrefix?.length) {
+  // Warm-context resume (--resume): a prior run journaled this worker's turns.
+  // Preferred path: the journal recorded a REAL kimi session id (resumeThreadId)
+  // — re-attach with `-S <id>`; kimi holds the full context (tool calls included).
+  // Fallback path: rebuild the transcript from the journaled prompts/results so
+  // the first live turn can re-establish context by prepending it. Both paths
+  // need the transcript rebuilt (it also backs the -S "session not found"
+  // fallback), so replay it whenever the journal recorded the prompts.
+  const rebuildable =
+    opts.replayPrefix?.length &&
+    opts.replayPrefix.every((t) => t.prompt != null && t.result != null);
+  if (rebuildable) {
     for (const turn of opts.replayPrefix) {
-      if (turn.prompt != null && turn.result != null) {
-        driver._appendToTranscript(turn.prompt, turn.result);
-      }
+      driver._appendToTranscript(turn.prompt, turn.result);
     }
     driver.resumed = true;
+  }
+  if (opts.resumeThreadId && KIMI_SESSION_ID_RE.test(opts.resumeThreadId)) {
+    driver.kimiSessionId = opts.resumeThreadId;
+    driver.threadId = opts.resumeThreadId;
+    driver.resumed = true;
+  } else if (opts.replayPrefix?.length && !rebuildable) {
+    // Old-scheme journal (promptHash only, synthetic thread id): neither a real
+    // -S resume nor a transcript rebuild is possible. Clean invalidation — the
+    // runtime sees resumed:false and re-runs every turn live.
+    log(
+      "session resume: journal has no kimi session id and predates prompt recording — re-running turns live",
+    );
   }
 
   return driver;
@@ -94,9 +122,14 @@ export class KimiSessionDriver {
     this._runAgent = runAgent;
     this._active = false;
     this.resumed = false;
+    // Placeholder until the first turn's `session.resume_hint` reveals the real
+    // persisted-session id; then threadId/kimiSessionId become that id and every
+    // follow-up turn resumes it with `-S` (no transcript re-send).
     this.threadId = `kimi-session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    this.kimiSessionId = null;
     this.currentTurnId = null;
     this._transcript = [];
+    this._turnAbort = null; // AbortController for the active turn (the kill handle)
   }
 
   _appendToTranscript(prompt, result) {
@@ -112,23 +145,55 @@ export class KimiSessionDriver {
     const turnId = `turn-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     this._active = true;
     this.currentTurnId = turnId;
+    const controller = new AbortController();
+    this._turnAbort = controller;
 
     const startedAt = Date.now();
-    const fullPrompt = this._buildPrompt(prompt, turnOpts.schema, turnOpts.effort);
+    let fullPrompt = this._buildPrompt(prompt, turnOpts.schema, turnOpts.effort, {
+      // With a resumable kimi session the context lives server-side in the
+      // persisted session — send ONLY the new turn (no system prompt re-send,
+      // no transcript prepend). Otherwise (first turn, or no session id yet)
+      // send system prompt + transcript to establish/rebuild context.
+      bare: !!this.kimiSessionId,
+    });
+
+    const runOnce = (resumeSessionId) =>
+      this._runAgent(fullPrompt, {
+        cwd: this.cwd,
+        model: turnOpts.model ?? this.model,
+        systemPrompt: null, // already baked into fullPrompt
+        schema: turnOpts.schema,
+        effort: turnOpts.effort,
+        timeoutMs: turnOpts.timeoutMs ?? DEFAULT_TURN_TIMEOUT_MS,
+        onProgress: turnOpts.onProgress,
+        log: this._log,
+        retries: 0, // turn-level retries are handled by the runtime wrapper
+        resumeSessionId: resumeSessionId ?? undefined,
+        signal: controller.signal,
+        onSessionId: (sid) => {
+          if (typeof sid === "string" && KIMI_SESSION_ID_RE.test(sid)) {
+            this.kimiSessionId = sid;
+            this.threadId = sid; // journaled per turn — the --resume re-attach key
+          }
+        },
+      });
 
     const completion = (async () => {
       try {
-        const text = await this._runAgent(fullPrompt, {
-          cwd: this.cwd,
-          model: turnOpts.model ?? this.model,
-          systemPrompt: null, // already baked into fullPrompt
-          schema: turnOpts.schema,
-          effort: turnOpts.effort,
-          timeoutMs: turnOpts.timeoutMs ?? DEFAULT_TURN_TIMEOUT_MS,
-          onProgress: turnOpts.onProgress,
-          log: this._log,
-          retries: 0, // turn-level retries are handled by the runtime wrapper
-        });
+        let text;
+        try {
+          text = await runOnce(this.kimiSessionId);
+        } catch (e) {
+          // A journaled session id kimi no longer has (`Session "..." not found.`):
+          // fall back ONCE to a fresh session, rebuilding context by prepending
+          // the transcript. The fresh run's resume_hint re-arms -S for later turns.
+          const notFound = /Session ".*" not found/i.test(String(e?.message ?? ""));
+          if (!this.kimiSessionId || !notFound || controller.signal.aborted) throw e;
+          this._log(`kimi session ${this.kimiSessionId} not found — rebuilding context from the transcript`);
+          this.kimiSessionId = null;
+          fullPrompt = this._buildPrompt(prompt, turnOpts.schema, turnOpts.effort, { bare: false });
+          text = await runOnce(null);
+        }
         const result = turnOpts.schema ? parseSchemaResult(text, turnOpts.schema) : text;
         this._appendToTranscript(prompt, result);
         const tokens = estimateTokens(fullPrompt) + estimateTokens(text);
@@ -143,11 +208,12 @@ export class KimiSessionDriver {
           turnId,
         };
       } catch (e) {
+        const interrupted = e?.interrupted || controller.signal.aborted;
         return {
-          status: "failed",
+          status: interrupted ? "interrupted" : "failed",
           result: null,
           text: null,
-          error: String(e?.message ?? e),
+          error: interrupted ? null : String(e?.message ?? e),
           model: this.model,
           tokens: estimateTokens(fullPrompt),
           ms: Date.now() - startedAt,
@@ -155,21 +221,24 @@ export class KimiSessionDriver {
         };
       } finally {
         this._active = false;
+        if (this._turnAbort === controller) this._turnAbort = null;
       }
     })();
 
     return { turnId, completion };
   }
 
-  _buildPrompt(prompt, schema, effort) {
+  _buildPrompt(prompt, schema, effort, { bare = false } = {}) {
     const parts = [];
-    if (this.systemPrompt) parts.push(this.systemPrompt);
-    if (this._transcript.length) {
-      parts.push("Previous turns in this session:");
-      for (const turn of this._transcript) {
-        parts.push(`${turn.role === "user" ? "Q" : "A"}: ${turn.content}`);
+    if (!bare) {
+      if (this.systemPrompt) parts.push(this.systemPrompt);
+      if (this._transcript.length) {
+        parts.push("Previous turns in this session:");
+        for (const turn of this._transcript) {
+          parts.push(`${turn.role === "user" ? "Q" : "A"}: ${turn.content}`);
+        }
+        parts.push("Now respond to the next turn.");
       }
-      parts.push("Now respond to the next turn.");
     }
     if (effort) parts.push(`(thinking effort: ${effort})`);
     parts.push(typeof prompt === "string" ? prompt : JSON.stringify(prompt));
@@ -182,15 +251,14 @@ export class KimiSessionDriver {
     return parts.join("\n\n");
   }
 
-  // Interrupt the active turn. For a subprocess-based session this is best-effort
-  // (the process is killed). The turn's completion promise resolves with status
-  // "interrupted". No-op if nothing is running.
+  // Interrupt the active turn: abort the turn's controller, which SIGTERMs the
+  // live kimi subprocess. The turn's completion promise resolves with status
+  // "interrupted" (the runtime maps it to "cancelled" when the workflow asked).
+  // No-op if nothing is running.
   async interruptCurrent() {
-    if (this._active) {
-      // The subprocess is not held on this driver, so we cannot directly kill it.
-      // Mark that cancellation was requested; the completion will still resolve
-      // normally but the runtime wrapper maps interrupted/failed as needed.
-      this._log(`interrupt requested for ${this.threadId} (best-effort with subprocess sessions)`);
+    if (this._active && this._turnAbort) {
+      this._log(`interrupting active turn on ${this.threadId}`);
+      this._turnAbort.abort();
     }
   }
 

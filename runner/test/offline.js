@@ -828,6 +828,7 @@ function makeFakeSessionFactory() {
   assert.equal(lines[0].sessionId, "s1", "entry carries the worker id (the viewer groups turns by it)");
   assert.equal(lines[0].turn, 0, "entry carries the turn index");
   assert.ok(lines[0].threadId, "entry carries the Kimi session id (resume provenance)");
+  assert.equal(lines[0].prompt, "go", "entry records the turn PROMPT (so --resume can rebuild the session transcript)");
   const agentKey = j.nextKey("go", { model: null });
   assert.ok(!agentKey.startsWith("sess:"), "agent() keys are NEVER in the sess: namespace (no fake resurrection)");
   await rm(dir, { recursive: true, force: true });
@@ -853,13 +854,17 @@ function makeFakeSessionFactory() {
   assert.equal(r1, "echo:question one");
 
   // run 2: resume — re-attach succeeds; both journaled turns replay with NO model
-  // work; a NEW steer runs live on the resumed thread.
+  // work; a NEW steer runs live on the resumed thread. The runtime must pass BOTH
+  // re-attach inputs the real driver honors: the journaled thread id (`-S` resume)
+  // and the completed-turn prefix WITH prompts (transcript-rebuild fallback).
   const j2 = new Journal(jpath, { reuse: true });
   await j2.load();
   const beginCalls = [];
   let resumeReq = null;
+  let prefixReq = null;
   const startSession2 = async (opts) => {
     resumeReq = opts.resumeThreadId ?? null;
+    prefixReq = opts.replayPrefix ?? null;
     const threadId = opts.resumeThreadId ?? "fresh-thread";
     return {
       threadId, resumed: !!opts.resumeThreadId,
@@ -881,6 +886,9 @@ function makeFakeSessionFactory() {
     'return { a: a.result, b: b.result, c: c.result, thread: s.threadId };',
   ].join("\n"), { startSession: startSession2, journal: j2, onEvent: (e) => events2.push(e) });
   assert.equal(resumeReq, "fake-thread-1", "the runtime passes the journaled thread id to re-attach");
+  assert.ok(Array.isArray(prefixReq) && prefixReq.length === 2, "the runtime passes the completed-turn prefix to the driver");
+  assert.deepEqual(prefixReq.map((t) => t.prompt), ["load corpus", "question one"],
+    "the prefix carries each turn's PROMPT (the driver rebuilds the transcript from it)");
   assert.equal(r2.a, "echo:load corpus", "turn 0 replays the journaled result");
   assert.equal(r2.b, "echo:question one", "turn 1 (steer) replays too");
   assert.equal(r2.c, "live:question two", "the NEW steer runs live on the warm thread");

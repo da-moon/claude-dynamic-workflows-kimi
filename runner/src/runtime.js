@@ -355,11 +355,12 @@ export function createRuntime({
 
   // ── Sessionful workers (agent.start / agent.waitAny / session.*) ──────────────
   // Long-lived Kimi workers the workflow can spawn, wait on, and steer with
-  // follow-up turns on the SAME transcript (see references/authoring.md → "Sessionful
-  // workers" and examples/sessionful-workers.workflow.js). Turns journal under a
-  // `sess:<id>#<turn>` keyspace that agent() never generates. Resume is WARM: on a
-  // --resume the worker replays its journaled completed-turn prefix into the transcript
-  // so the next steer sees the previous context.
+  // follow-up turns on the SAME persisted kimi session (see references/authoring.md
+  // → "Sessionful workers" and examples/sessionful-workers.workflow.js). Turns
+  // journal under a `sess:<id>#<turn>` keyspace that agent() never generates.
+  // Resume is WARM: on a --resume the worker re-attaches to its persisted kimi
+  // session (`-S <id>`, or a transcript rebuild fallback) and replays its
+  // journaled completed-turn prefix free, so the next steer sees the previous context.
 
   const TIMEOUT = Symbol("waitAny-timeout");
   const isRunningStatus = (s) => s === "starting" || s === "running";
@@ -485,7 +486,7 @@ export function createRuntime({
           outcome = { status: "failed", error: String(e?.message ?? e), turnId: begun.turnId };
         }
         try {
-          return await this._settleTurn(outcome, { sessKey, turnIndex, effort, promptHash: identityHash(prompt) });
+          return await this._settleTurn(outcome, { sessKey, turnIndex, effort, promptHash: identityHash(prompt), prompt });
         } finally {
           release(); // free the slot held for THIS turn (exactly once)
         }
@@ -494,7 +495,7 @@ export function createRuntime({
 
     // Fold a turn outcome into the snapshot, emit the terminal event, and journal it
     // (observability only). Never throws, so the completion promise never rejects.
-    async _settleTurn(outcome, { sessKey, turnIndex, effort, promptHash }) {
+    async _settleTurn(outcome, { sessKey, turnIndex, effort, promptHash, prompt }) {
       this._settled = true;
       const snapStatus =
         outcome.status === "completed" ? "completed" :
@@ -518,11 +519,15 @@ export function createRuntime({
       } catch {}
       if (journal) {
         try {
+          // `prompt` is recorded verbatim (alongside its identity hash) so a
+          // --resume can rebuild the session transcript when the persisted kimi
+          // session is gone — see startKimiSession's replayPrefix fallback.
           await journal.record(sessKey, this.label, this._snapshot.result ?? this._snapshot.text ?? null, {
             phase: this.phase, effort: effort ?? null, model: this._snapshot.model,
             tokens: this._snapshot.tokens, ms: this._snapshot.ms,
             session: true, sessionId: this.id, turn: turnIndex, status: snapStatus,
             threadId: this._driver.threadId ?? null, promptHash: promptHash ?? null,
+            prompt: prompt == null ? null : typeof prompt === "string" ? prompt : JSON.stringify(prompt),
           });
         } catch {}
       }
@@ -591,9 +596,11 @@ export function createRuntime({
     const id = `s${++sessionSeq}`;
 
     // Warm-context resume (--resume): a prior run journaled this worker's turns
-    // under sess:<id>#<n> with its Kimi session id. Collect the completed-turn
-    // prefix (replay candidates). On resume, the driver rebuilds the transcript from
-    // the prefix so the next steer retains context.
+    // under sess:<id>#<n> with its persisted kimi session id and each turn's
+    // prompt. Collect the completed-turn prefix (replay candidates) and the last
+    // recorded session id; the driver re-attaches with `-S <id>` (preferred) or
+    // rebuilds the transcript from the prefix, and reports `resumed: true` so the
+    // journaled turns replay free below.
     let replayPrefix = null;
     let resumeThreadId = null;
     if (journal && journal.reuse) {
@@ -615,7 +622,11 @@ export function createRuntime({
 
     let driver;
     try {
-      driver = await startSession({ ...merged, defaultModel, pinnedModel, log: onLog, resumeThreadId: resumeThreadId ?? undefined });
+      driver = await startSession({
+        ...merged, defaultModel, pinnedModel, log: onLog,
+        resumeThreadId: resumeThreadId ?? undefined,
+        replayPrefix: replayPrefix ?? undefined,
+      });
     } catch (e) {
       release();
       throw e;
