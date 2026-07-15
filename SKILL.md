@@ -67,8 +67,9 @@ Every run, in order (the sections below expand each step):
 3. **Author** the script into the repo (`./<name>.workflow.js`).
 4. **Settings:** `--frontier` · effort by scale (`--effort medium` for a
    `quick_harness`, `--auto-effort` for `standard`/`deep`) · a bounded `--budget`
-   · strict schemas (`additionalProperties:false`). Runs are **full-auto** —
-   `--sandbox` only labels intent (see *Run defaults → Sandbox & permissions*).
+   · strict schemas (`additionalProperties:false`). Runs are **full-auto** by
+   default; `--sandbox read-only` opts audit/research runs into enforced
+   containment (see *Run defaults → Sandbox & permissions*).
 5. **Size it** — run `--plan` first for any expensive or complex workflow.
 6. **Run** on the Kimi runner (never the native `Workflow` tool).
 7. **Surface** — inline ASCII map + `summarize-run` highlights; cite the script,
@@ -87,7 +88,7 @@ Read the mode from the user's phrasing, then behave accordingly:
 | **`run-existing`** | a script path or saved-workflow name is given | Skip compilation; run that script/name through the runner. |
 | **`quick`** | "quick", "small", "cheap" | Bias to a `quick_harness` (2–5 agents). |
 | **`deep`** | "deep", "thorough", "exhaustive" | Allow a larger / `deep_harness`; justify the size. |
-| **`no-write`** | "don't write files", "just tell me" | Return final JSON/Markdown only; no report/source files; instruct every agent not to write (and label the run `--sandbox read-only` — advisory, not enforced). |
+| **`no-write`** | "don't write files", "just tell me" | Return final JSON/Markdown only; no report/source files; instruct every agent not to write and run with `--sandbox read-only` — enforced: worktree-isolated cwds discard stray writes (needs a git repo; the runner refuses fast otherwise). |
 
 Two precedence rules: if the user gives a **script path or saved name**, run it
 (don't recompile). If the user gives a **detailed spec**, honor it as written but
@@ -131,10 +132,12 @@ are unchanged; steps 2 and 4 are where rough intent gets compiled.
 
 4. **Choose run settings** (see *Run defaults*): `--frontier`, the effort flag for
    the chosen scale (`--auto-effort` for a standard/deep harness, `--effort medium`
-   for a quick one), and a bounded `--budget`. Runs execute **full-auto**; a
-   `--sandbox` value only labels intent (see *Run defaults → Sandbox &
-   permissions*). For an expensive or complex workflow, **`--plan` first** — a
-   no-token dry run that counts agents per phase/effort and estimates a `--budget`.
+   for a quick one), and a bounded `--budget`. Runs execute **full-auto** by
+   default; add `--sandbox read-only` for audits/research — it is enforced
+   (worktree-isolated cwds + a hard preamble; needs a git repo) (see *Run
+   defaults → Sandbox & permissions*). For an expensive or complex workflow,
+   **`--plan` first** — a no-token dry run that counts agents per phase/effort
+   and estimates a `--budget`.
 
 5. **Run** it — **always pass `--frontier`**, plus the effort flag for the chosen
    scale: `--auto-effort` for a standard/deep harness (it scales each agent's effort
@@ -509,8 +512,9 @@ this section is the policy, not the reference):
 | Model | `--frontier` | one frontier model for every agent (see *Model*) |
 | Effort — `quick_harness` | `--effort medium` (or `--pin-effort medium`) | a small analytical run doesn't need layer-scaled effort; a flat, cheaper tier suffices |
 | Effort — `standard` / `deep` | `--auto-effort` | scales effort to layer width; lone synthesis/judge gates get `xhigh`, fan-outs floor at `high` |
-| Permissions | **full-auto (unrestricted)** — the default; no flag needed | headless `kimi -p` auto-approves every tool action; the runner adds no gate (see *Sandbox & permissions* below) |
-| Intent label | `--sandbox read-only` (audits/research) · `workspace-write` (runs meant to write) | **advisory metadata only** — journaled (cache identity) and reported, never enforced |
+| Permissions | **full-auto (unrestricted)** — the default; no flag needed | headless `kimi -p` auto-approves every tool action; with no sandbox value the runner adds no gate (see *Sandbox & permissions* below) |
+| Read-only runs | `--sandbox read-only` (audits/research) | **enforced, best-effort** — worktree-isolated cwd per agent (stray writes discarded) + hard read-only preamble; refused fast outside a git repo. Not a security boundary (absolute paths/shell/network can escape) |
+| Intent label | `--sandbox workspace-write` (runs meant to write) | **advisory metadata only** — journaled (cache identity) and reported as advisory; behavior identical to full-auto |
 | Cost | a bounded `--budget`, sized via `--plan` | hard ceiling; `--plan` estimates it |
 | Expensive / complex run | **`--plan` first** | no-token dry run before the live run |
 | Structured output | JSON schemas with `additionalProperties: false` | strict and parseable |
@@ -518,16 +522,28 @@ this section is the policy, not the reference):
 
 **Sandbox & permissions.** Every agent turn is a headless `kimi -p` run, and
 headless Kimi **auto-approves every tool action** — reads, writes, shell
-commands. **Full-auto, unrestricted execution is the supported default** for
-workflow runs: the runner adds no permission gate of its own, and kimi 0.23.3
-exposes none for `-p` (it cannot even be combined with `--yolo`; a `-p` run is
-already unrestricted). The `--sandbox` flag and the per-call `sandbox` opt are
-**advisory metadata**: recorded in the journal (part of each agent's cache
-identity) and shown in run reports — useful for documenting intent — but not
-enforced. `--sandbox read-only` does **not** prevent writes. Mechanical
-enforcement is planned but not implemented; until then, put explicit read-only
-instructions in the prompts of agents that must not write, and point untrusted
-or exploratory runs at a disposable checkout/worktree.
+commands. **Full-auto, unrestricted execution is the supported, first-class
+default** for workflow runs: with no sandbox value set the runner adds no
+permission gate, no preamble, nothing (kimi 0.23.3 exposes no permission
+surface for `-p`; it cannot even be combined with `--yolo`).
+
+`--sandbox read-only` (or a per-call `sandbox: 'read-only'`) is **enforced,
+runner-side, best-effort**: each read-only agent runs with its cwd moved into a
+disposable detached git worktree at HEAD (stray writes land there and are
+**discarded**, touched paths logged) and gets a hard read-only preamble above
+its system prompt. A read-only request the runner cannot mechanically honor —
+cwd not a git repo, or a repo with no commits — is **refused fast, before any
+spawn** (per call, at session start, and at CLI startup), never silently
+downgraded to a label. The journal records `sandboxEnforced` per agent and
+`summarize-run` shows enforced-vs-advisory, so a journaled `read-only` means
+"mechanically contained". Know the limits: it is containment, **not a security
+boundary** — absolute paths, `cd`, shell side effects, and network access can
+still escape — and read-only agents see HEAD, not uncommitted changes.
+
+`workspace-write` and `danger-full-access` remain **advisory metadata**:
+journaled and reported (as advisory), behavior identical to full-auto. Keep
+explicit read-only instructions in audit prompts as belt-and-braces, and point
+untrusted *write-capable* runs at a disposable checkout/worktree.
 
 Three facts to encode correctly, since they're easy to get wrong:
 
@@ -673,8 +689,9 @@ prompt; the reply is parsed — `null` when the model doesn't comply, so
 model), `agentType` (loads `.kimi/agents/<name>.md` or `.claude/agents/<name>.md`
 as the system prompt), `systemPrompt`, `effort`
 (usually omit — let `--auto-effort` scale it to layer width; see *Effort*),
-`sandbox` (`read-only` | `workspace-write` | `danger-full-access` — **advisory
-metadata**: journaled and reported, not enforced), `isolation:
+`sandbox` (`read-only` is **enforced** — worktree-isolated cwd + hard preamble,
+refused fast if unavailable; `workspace-write` | `danger-full-access` stay
+advisory labels; see *Sandbox & permissions*), `isolation:
 'worktree'`, `cwd`, `personality`, `retries`, `label`, `phase` (group/attribute
 this agent — set it inside concurrent `pipeline`/`parallel` stages), `timeoutMs`.
 
@@ -700,8 +717,10 @@ run-workflow <script.js>
   --effort E       none|minimal|low|medium|high|xhigh; flat fallback; unset → no effort hint sent
   --auto-effort    scale effort to layer width: 1→xhigh, 2+→high (floor) (recommended; overrides --effort)
   --pin-effort E   force ALL agents to effort E (overrides per-call effort)
-  --sandbox S      read-only | workspace-write | danger-full-access — advisory intent
-                   label (journaled + reported, NOT enforced; agents run full-auto)
+  --sandbox S      read-only → ENFORCED best-effort (worktree-isolated cwds +
+                   hard preamble; refused fast outside a git repo);
+                   workspace-write | danger-full-access → advisory labels only.
+                   Omit for the default: unrestricted full-auto.
   --budget N       token ceiling backing budget.total / budget.remaining()
   --budget-meter M what budget.spent() counts: total (default) | output (native pool)
   --plan           dry run: count agents per phase/effort + estimate a --budget (no tokens; alias --dry-run)
@@ -738,8 +757,9 @@ Unknown flags are rejected with an error (exit 1) — the runner never guesses.
 - **Cost** — a run can spawn many agents and use real tokens. Keep the single
   frontier model (see *Model*) and bound cost with `--auto-effort` (already
   cheaper on wide layers) plus a `--budget` backstop — **not** by downgrading to a
-  smaller model. To squeeze further, `--pin-effort low`. (`--sandbox` is an
-  advisory intent label, not a safety or cost lever — agents always run full-auto.)
+  smaller model. To squeeze further, `--pin-effort low`. (`--sandbox read-only`
+  is containment, not a cost lever — and its worktree isolation only redirects
+  writes; agents still run full-auto within it.)
 - **Sizing `--budget`** — it is a *hard ceiling that throws mid-run*, not an
   advisory: size it for the **whole fan-out**, not one agent. Run **`--plan`**
   first — a no-token dry run that counts agents per phase/effort and prints an

@@ -53,7 +53,7 @@ status`.
   "script": "/abs/path/to/script", "runId": "alpha" ,
   "budget": 1500000, "budgetMeter": "total",
   "model": "kimi-code/kimi-for-coding", "autoEffort": true, "pinEffort": null,
-  "sandbox": "read-only", "interactive": true
+  "sandbox": "read-only", "sandboxEnforcement": "enforced", "interactive": true
 }
 ```
 

@@ -153,14 +153,14 @@ You don't manage flags; you describe what you want and Claude wires it up. Commo
 | **Watch it build live** | "…and let me watch it" · "open the live GUI" | opens a browser viewer (`--gui`) and/or a new-terminal ASCII map (`--tui`) that update **in place** as agents run |
 | **See the size/cost first** | "plan it first — how many agents, roughly how much?" | a **no-token dry run** (`--plan`) that counts agents per phase and estimates a budget |
 | **Cap the spend** | "keep it under ~5M tokens" | a hard `--budget` ceiling — tripping it isn't fatal, it prints a one-line `--resume` to continue |
-| **Keep it read-only (safety)** | "read-only — don't let agents write files" | authors read-only instructions into every agent's prompt and labels the run `--sandbox read-only`. **Advisory**: the label is journaled and reported, but headless Kimi runs full-auto — nothing mechanically blocks writes ([Safety](#safety)) |
-| **Let it edit files** | "let it apply the migration" | nothing to unlock — agents already run **full-auto** (read/write/shell, no prompting); the run is labeled `--sandbox workspace-write` so the intent is recorded |
+| **Keep it read-only (safety)** | "read-only — don't let agents write files" | runs with `--sandbox read-only`, which is **enforced** (best-effort): every agent gets a disposable worktree cwd — stray writes never touch your checkout and are discarded — plus a hard read-only preamble. Refused fast if the isolation is unavailable. Not a security boundary: absolute paths/shell/network can still escape ([Safety](#safety)) |
+| **Let it edit files** | "let it apply the migration" | nothing to unlock — agents already run **full-auto** (read/write/shell, no prompting), the first-class default; the run can be labeled `--sandbox workspace-write` so the intent is recorded (advisory — behavior unchanged) |
 | **Resume after a stop** | "resume that run" | replays already-finished agents from the journal **free**, runs only the rest; sessionful workers re-attach to their persisted threads **warm** |
 | **Be asked before risky steps** | "check with me before applying anything" | authors a `human()` gate — the live viewer shows an **answer card** (choices + free text) right in the run page; the run waits there, fleet warm, and falls back to a safe default on timeout |
 | **Pick a specific pattern** | "do a loop-until-dry bug hunt" · "fresh-context review with independent reviewers" | authors that exact pattern (see the [pattern library](references/authoring.md)) |
 | **Run a supervised fleet** | "`--multi`" · "throw a few different harnesses at this at once" | launches 2–4 concurrent variant workflows in the background and **supervises them itself** — polls `fleet status`, answers their gates, steers, kills dead ends, forks winners, then synthesizes across runs (see walkthrough 8) |
 
-One thing you *don't* tune: it's always **one frontier model for every agent** — no model-mixing. Thinking **effort** scales to the harness instead (a quick 2–5-agent run goes flat `--effort medium`; bigger runs use `--auto-effort`, so lone judge/synthesis gates think hardest). **To spend less**, lower the **budget**, drop the **effort**, narrow the **fan-out**, and **`--plan` first** to size it — never a smaller model. (Read-only is an **intent label** — what agents *should* touch — not a cost lever, and not yet an enforced one; see [Safety](#safety).)
+One thing you *don't* tune: it's always **one frontier model for every agent** — no model-mixing. Thinking **effort** scales to the harness instead (a quick 2–5-agent run goes flat `--effort medium`; bigger runs use `--auto-effort`, so lone judge/synthesis gates think hardest). **To spend less**, lower the **budget**, drop the **effort**, narrow the **fan-out**, and **`--plan` first** to size it — never a smaller model. (Read-only is a **containment** setting — agents run cwd-isolated so writes can't dirty your tree — not a cost lever; see [Safety](#safety).)
 
 ### Example invocations
 
@@ -228,7 +228,7 @@ Claude authors a **root-cause lab**: a parallel **Triage** (metrics · logs · r
 
 > `/kimi-workflows  Audit every route under src/ for missing authorization, read-only. Have an independent skeptic try to refute each finding before you report it.`
 
-The classic **find → adversarially-verify** shape, and the reason to use a fleet instead of one agent: one pass *finds* candidates in parallel (one agent per area), then a **second, independent agent tries to refute each** — defaulting to "not a real finding" unless it can prove exploitability with a `file:line`. Plausible-but-wrong findings die in verification instead of in your inbox. You get a deduped table of *confirmed* issues with evidence, and every agent is instructed read-only so nothing gets written — though note the `--sandbox read-only` label itself is advisory (recorded, not enforced; see [Safety](#safety)). Swap "authorization" for "missing input validation", "unhandled promise rejections", "N+1 queries", "PII in logs" — same harness.
+The classic **find → adversarially-verify** shape, and the reason to use a fleet instead of one agent: one pass *finds* candidates in parallel (one agent per area), then a **second, independent agent tries to refute each** — defaulting to "not a real finding" unless it can prove exploitability with a `file:line`. Plausible-but-wrong findings die in verification instead of in your inbox. You get a deduped table of *confirmed* issues with evidence, and with `--sandbox read-only` every agent runs mechanically contained — a disposable worktree cwd plus a hard read-only preamble, so stray writes never reach your checkout (best-effort; see [Safety](#safety)). Swap "authorization" for "missing input validation", "unhandled promise rejections", "N+1 queries", "PII in logs" — same harness.
 
 ### 3 · Load a big thing once, then interrogate it cheaply
 
@@ -492,7 +492,7 @@ node runner/bin/map-run.js  <project-dir> --watch
 node runner/bin/summarize-run.js <project-dir>         # also: --json / --markdown / --out PATH
 ```
 
-Key flags: `--frontier` (pin the strongest configured model), `--auto-effort` (scale effort to layer width), `--plan` (dry-run agent count + budget estimate, no tokens; alias `--dry-run`), `--budget N` (token ceiling) with `--budget-meter total|output`, `--sandbox read-only|workspace-write` (advisory intent label — see [Safety](#safety)), `--tui` / `--gui` / `--monitor` (live monitors), `--resume`, `--summary` (full end-of-run report). See `node runner/bin/run-workflow.js --help`.
+Key flags: `--frontier` (pin the strongest configured model), `--auto-effort` (scale effort to layer width), `--plan` (dry-run agent count + budget estimate, no tokens; alias `--dry-run`), `--budget N` (token ceiling) with `--budget-meter total|output`, `--sandbox read-only|workspace-write` (read-only is enforced best-effort, the rest advisory — see [Safety](#safety)), `--tui` / `--gui` / `--monitor` (live monitors), `--resume`, `--summary` (full end-of-run report). See `node runner/bin/run-workflow.js --help`.
 
 ### The run summary report
 
@@ -566,7 +566,7 @@ Claude Code's workflow runtime is sealed inside its binary, so this is an **exte
 | `session.cancel()` | terminates the live kimi subprocess — the turn resolves `cancelled`, race losers stop billing |
 | `agentType: 'x'` | loads `.kimi/agents/x.md` (or `.claude/agents/x.md`) → the system prompt |
 | Claude model id / alias | mapped to a **configured** Kimi model (`kimi provider list`): opus/sonnet → `kimi-for-coding`, haiku → `kimi-for-coding-highspeed` |
-| sandbox / permissions | **full-auto** — headless `kimi -p` auto-approves every tool action; `sandbox` is recorded as advisory metadata ([Safety](#safety)) |
+| sandbox / permissions | **full-auto** by default — headless `kimi -p` auto-approves every tool action; `sandbox:'read-only'` is **enforced** runner-side (worktree cwd + hard preamble; refused if unavailable), other values are advisory labels ([Safety](#safety)) |
 | transient errors | retry with backoff (default 3); permanent errors (unconfigured model, bad flags, config.invalid) fail fast |
 | `parallel` / `pipeline` / `phase` / `budget` | unchanged — provider-neutral JS |
 
@@ -583,9 +583,13 @@ Full internals, the protocol mapping, and a faithfulness comparison vs. the nati
 
 ## Safety
 
-**Every agent runs full-auto — that is the supported default.** Each `agent()` turn is a headless `kimi -p` run, and headless Kimi **auto-approves every tool action**: agents read, write, and execute shell commands without prompting, and the runner adds no permission gate of its own (kimi 0.23.3 exposes none for `-p` — a headless run is already unrestricted). The `--sandbox` flag and the per-call `sandbox` opt are **advisory metadata**: recorded in the journal (part of each agent's cache identity) and shown in run reports — useful for documenting intent — but they do **not** enforce anything. `--sandbox read-only` does not prevent writes. Mechanical sandbox enforcement is planned but not implemented yet.
+**Every agent runs full-auto — that is the supported, first-class default.** Each `agent()` turn is a headless `kimi -p` run, and headless Kimi **auto-approves every tool action**: agents read, write, and execute shell commands without prompting, and with no sandbox value set the runner adds no gate, no preamble, nothing (kimi 0.23.3 exposes no permission surface for `-p` — a headless run is already unrestricted).
 
-Practical guidance: read a workflow script before you run it, put explicit read-only instructions in the prompts of audit/research agents, and run untrusted or exploratory tasks in a disposable checkout, worktree, or container. The workflow *script itself* is isolated (a locked-down `node:vm` — no filesystem/network/process access) — only the agents act.
+**`--sandbox read-only` (or a per-call `sandbox: 'read-only'`) is enforced — opt-in, runner-side, best-effort.** Each read-only agent runs with its cwd moved into a **disposable detached git worktree at HEAD** (a sessionful worker keeps one for its lifetime), so stray writes land off your real tree and are **discarded** (touched paths logged), and a **hard read-only preamble** is prepended to its prompt. A read-only request that cannot be mechanically honored — the cwd is not a git repo, or the repo has no commits — is **refused fast, before any spawn**, never silently downgraded to a label. The journal records `sandboxEnforced` per agent and `summarize-run` reports enforced-vs-advisory, so a journaled `read-only` means "mechanically contained".
+
+**What read-only does not guarantee:** it is containment, not a security boundary. The agent still runs full-auto inside its worktree and can escape via **absolute paths**, `cd` elsewhere, shell side effects (installs, network calls), or `git push`; reads see HEAD, so uncommitted changes are invisible to it. `workspace-write` and `danger-full-access` remain **advisory labels** — journaled and reported, behavior identical to the default (there is nothing beyond full-auto to unlock).
+
+Practical guidance: read a workflow script before you run it, use `--sandbox read-only` for audit/research runs (and keep explicit read-only instructions in prompts as belt-and-braces), and run untrusted or exploratory *write-capable* tasks in a disposable checkout, worktree, or container. The workflow *script itself* is isolated (a locked-down `node:vm` — no filesystem/network/process access) — only the agents act.
 
 ## Limitations (honest)
 

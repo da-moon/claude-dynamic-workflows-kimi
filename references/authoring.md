@@ -72,7 +72,7 @@ a fresh `kimi -p <prompt> --output-format stream-json` subprocess per call.
 | `agentType` | name of a subagent in `.claude/agents/<name>.md`; its body becomes the system prompt, its frontmatter `model` a fallback |
 | `systemPrompt` | explicit developer instructions (overrides `agentType` body) |
 | `effort` | `none`/`minimal`/`low`/`medium`/`high`/`xhigh`. **Usually leave unset and run with `--auto-effort`**, which scales effort to each layer's parallel width (1→`xhigh`, 2+→`high` — the floor) so lone gate agents get the policy's extra-high tier while every fan-out still gets `high`. A per-call `effort` *overrides* the policy, so set it only as a deliberate exception. Precedence: `--pin-effort` > per-call `effort` > `--auto-effort` > `--effort` > unset (no effort hint at all). Effort reaches Kimi as a **prompt hint** (`(thinking effort: X)` prepended to the turn), not an API parameter — a strong steer, not a hard guarantee. |
-| `sandbox` | `read-only` \| `workspace-write` \| `danger-full-access` — **advisory metadata only, never enforced.** Headless `kimi -p` runs are full-auto: every tool action, writes included, is auto-approved (that unrestricted mode is the supported default for workflow runs). The value is journaled (cache identity) and reported in summaries; `read-only` does **not** prevent writes — use prompt instructions and `isolation:'worktree'` to contain write-capable agents |
+| `sandbox` | `read-only` \| `workspace-write` \| `danger-full-access`. **`read-only` is ENFORCED (best-effort):** the agent's cwd moves into a disposable detached git worktree at HEAD (stray writes are contained and **discarded**, touched paths logged) and a hard read-only preamble tops its prompt; if that isolation is unavailable (cwd not a git repo) the call is **refused before any spawn** — never downgraded to a label. Limits: containment, not a security boundary (absolute paths / shell side effects / network can still escape), and reads see HEAD — not uncommitted changes. `workspace-write` / `danger-full-access` stay **advisory labels**: behavior is the default full-auto (every tool action auto-approved). All values are journaled (cache identity) with a per-agent `sandboxEnforced` fact and reported in summaries. Omit the opt for the default: unrestricted full-auto |
 | `isolation` | `'worktree'` → run in a detached git worktree at HEAD (parallel file-editing agents don't collide); kept if it leaves changes |
 | `cwd` | working directory for the thread (default the runner's cwd) |
 | `personality` | `none` \| `friendly` \| `pragmatic` |
@@ -387,9 +387,10 @@ Runnable: `examples/tournament-sort.workflow.js`.
 **Triage + quarantine** — classify a batch in parallel, dedupe in plain code,
 then a single router proposes actions from the *structured labels* — not the raw,
 untrusted item text. That structural quarantine (router never sees raw item text)
-is the injection-surface control here — **not** the `sandbox` opt, which is an
-advisory label the runner records but does not enforce (every headless kimi agent
-is write-capable). Runnable: `examples/triage.workflow.js`.
+is the injection-surface control here — **not** the `sandbox` opt: even an
+enforced `read-only` only contains file writes (a worktree cwd), not what an
+agent *concludes* from hostile text, and the advisory values contain nothing.
+Runnable: `examples/triage.workflow.js`.
 
 **Generate-and-filter** — spawn N candidate attempts, then filter by a rubric or a
 verifier pass; a special case of the judge panel when you only need "good enough,"
@@ -405,10 +406,12 @@ web search if your Kimi has web tools).
 
 - **Agents do the I/O, not the script.** The script is sandboxed (no fs/shell). To
   read or write files, instruct an `agent()` to do it — e.g. *"Read src/auth.ts
-  and …"*. Every agent runs headless **full-auto** (`kimi -p` auto-approves all
-  tool actions), so any agent can read *and write*; the `sandbox` opt only labels
-  intent (journaled + reported, never enforced). Scope what an agent touches with
-  its prompt, `cwd`, and `isolation:'worktree'`.
+  and …"*. By default every agent runs headless **full-auto** (`kimi -p`
+  auto-approves all tool actions), so any agent can read *and write*. For agents
+  that must not write, set `sandbox: 'read-only'` — enforced via a disposable
+  worktree cwd + hard preamble (see the opts table; needs a git-repo cwd, and a
+  read-only agent sees HEAD, not uncommitted changes). Scope what a
+  write-capable agent touches with its prompt, `cwd`, and `isolation:'worktree'`.
 - **Schemas**: prefer an object at the root. The runner **strict-normalizes** your
   schema (recursively: every property into `required`,
   `additionalProperties:false`) and embeds it in the prompt as an instruction —

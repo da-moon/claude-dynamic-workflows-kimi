@@ -44,7 +44,7 @@ workflow script (.js, unchanged)
 | `agentType: 'x'`              | loads `.claude/agents/x.md` → its body becomes the system prompt (prepended to the prompt) |
 | `model` (Claude id or alias)  | remapped onto the **configured** model set (`kimi provider list --json`) |
 | `systemPrompt` / `effort`     | prepended to the prompt (effort as a `(thinking effort: X)` hint — a steer, not an API parameter) |
-| sandbox / permissions         | **none** — headless `kimi -p` is full-auto (every tool action auto-approved); `sandbox` is an advisory label only (see below) |
+| sandbox / permissions         | headless `kimi -p` is full-auto (every tool action auto-approved) — the runner's first-class default. `sandbox:'read-only'` is **enforced runner-side** (worktree-isolated cwd + hard preamble; refused fast when unavailable); `workspace-write`/`danger-full-access` stay advisory labels (see below) |
 | transient errors              | retry with exponential backoff (default 3); permanent config errors fail fast |
 | `budget.spent()`              | summed per-turn **estimates** (~4 chars/token over prompt + final text; the CLI reports no usage) |
 | `parallel` / `pipeline`       | unchanged — pure JS scheduling                              |
@@ -60,8 +60,9 @@ kimi [-S <session_id>] -p <full prompt> --output-format stream-json [--model <co
 - **`-y` / `--yolo` / `--auto` are never passed.** kimi 0.23.3 hard-errors on
   `-p` + `--yolo` (`Cannot combine --prompt with --yolo`) — and they'd be
   redundant anyway: a headless `-p` run already **auto-approves every tool
-  action**. Unrestricted full-auto is the runner's default (and only) execution
-  mode; see *Sandbox honesty* below.
+  action**. Unrestricted full-auto is the runner's default execution mode; the
+  opt-in `read-only` sandbox is enforced entirely **runner-side** (cwd +
+  prompt), never via kimi flags — see *Sandbox enforcement* below.
 - The stdout stream is NDJSON. The turn's result is the **last** line with
   `role:"assistant"` and string `content`; assistant `tool_calls` lines, tool
   results, and meta lines are ignored.
@@ -69,26 +70,57 @@ kimi [-S <session_id>] -p <full prompt> --output-format stream-json [--model <co
   `{"role":"meta","type":"session.resume_hint","session_id":"session_<uuid>",…}` —
   the persisted-session id that `-S` accepts. One-shot `agent()` ignores it;
   sessions are built on it.
-- The **full prompt** is assembled by the runner: system prompt (from
-  `systemPrompt` or the `agentType` file), an optional `(thinking effort: X)`
-  hint, the prompt itself, and — with a `schema` — the strict-normalized schema
-  plus a "respond with a single JSON object" instruction.
+- The **full prompt** is assembled by the runner: for an enforced `read-only`
+  turn the hard sandbox preamble (first, above everything), then the system
+  prompt (from `systemPrompt` or the `agentType` file), an optional
+  `(thinking effort: X)` hint, the prompt itself, and — with a `schema` — the
+  strict-normalized schema plus a "respond with a single JSON object"
+  instruction.
 
-### Sandbox honesty (read this before pointing agents at anything sensitive)
+### Sandbox enforcement (read this before pointing agents at anything sensitive)
 
 kimi 0.23.3 has **no headless sandbox or approval surface**: a `kimi -p` run
-executes reads, writes, and shell commands without a permission gate. The
-runner's `--sandbox` flag and the per-call `sandbox` opt are **advisory
-metadata only** — they participate in the resume journal's cache identity and
-are reported in the meta sidecar and summaries, but nothing enforces them.
-`--sandbox read-only` does **not** prevent writes.
+executes reads, writes, and shell commands without a permission gate, and `-p`
+accepts no permission flags at all. That unrestricted **full-auto mode is the
+supported, first-class default** for workflow runs — it's what makes unattended
+fleets work — and with no sandbox value set the runner adds *nothing*: no gate,
+no preamble, byte-identical spawn args.
 
-That unrestricted **full-auto mode is the supported default** for workflow runs
-— it's what makes unattended fleets work. Contain agents *structurally*
-instead: scope prompts, set `cwd`, use `isolation:'worktree'` for parallel
-editors, and keep untrusted text away from agents whose output you'll act on
-(see `authoring.md` → *Triage + quarantine*). Real enforcement is future work,
-tracked in the repo's issues.
+`sandbox: 'read-only'` (per call, or `--sandbox read-only` as the run default)
+is **enforced, runner-side**:
+
+- the turn's `cwd` is moved into a **disposable detached git worktree at HEAD**
+  (a sessionful worker keeps one worktree for its whole lifetime), so
+  relative-path writes land off the real tree and are **discarded** after the
+  turn (the touched paths are logged);
+- a **hard read-only preamble** is prepended above the system prompt — defense
+  in depth; the worktree cwd is the mechanism of record;
+- a read-only request that cannot be mechanically honored (the cwd is not a
+  git repo, or the repo has no commits) is **refused before any spawn** with a
+  clear error — never silently downgraded to a label. Unknown `sandbox`
+  spellings are refused the same way (per call, at session start, and by the
+  CLI at startup);
+- the journal records `sandboxEnforced: true` per agent, the meta sidecar
+  records `sandboxEnforcement: "enforced"`, and `summarize-run` reports both
+  (policy line + per-agent counts), so a journaled `read-only` can be trusted
+  to mean "mechanically contained".
+
+**What `read-only` does NOT guarantee.** It is best-effort *containment*, not a
+security boundary: the agent still runs full-auto inside the worktree and can
+escape via **absolute paths**, `cd` to other directories, shell side effects
+(installs, network calls), or `git push`. Reads also see **HEAD** — uncommitted
+changes in the real tree are not visible from the worktree. Treat it as "stray
+writes can't dirty my checkout", not "this agent cannot act".
+
+`workspace-write` and `danger-full-access` remain **advisory labels**:
+journaled (cache identity) and reported as `advisory`, with behavior identical
+to the default — full-auto already grants everything they name, so there is
+nothing for the runner to add or subtract.
+
+For hostile-input concerns, still contain agents *structurally*: scope prompts,
+set `cwd`, use `isolation:'worktree'` for parallel editors, and keep untrusted
+text away from agents whose output you'll act on (see `authoring.md` →
+*Triage + quarantine*).
 
 ### Model selection
 
@@ -197,8 +229,10 @@ run-workflow <script.js>
   --effort E          none|minimal|low|medium|high|xhigh (flat fallback, prompt hint)
   --auto-effort       scale effort to each layer's parallel width: 1->xhigh, 2+->high (floor)
   --pin-effort E      force ALL agents to effort E (overrides per-call effort)
-  --sandbox S         read-only | workspace-write | danger-full-access
-                      (ADVISORY label only — journaled + reported, never enforced)
+  --sandbox S         read-only → ENFORCED best-effort (disposable worktree cwd +
+                      hard preamble; refused fast when isolation is unavailable);
+                      workspace-write | danger-full-access → advisory labels.
+                      Omit for the default: unrestricted full-auto.
   --retries N         transient-error retries per agent (default 3)
   --resume            reuse prior results from the journal (skip unchanged agents)
   --journal PATH      journal location (default .workflow-journal/<script>.jsonl)
@@ -349,10 +383,13 @@ agents, a **model & effort** breakdown, and **cache hit rate** on a resumed run.
 Token totals separate the journal's **all-in** sum (across resumes) from the
 **latest run's executed** tokens (agents that finished this run, matched by stable
 id); **budget usage** (from the meta sidecar) bills the latest run when the event
-sidecar is present, else the all-in total — and labels which. It also raises
+sidecar is present, else the all-in total — and labels which. The **run policy**
+line shows the sandbox with its enforcement verdict (`read-only (enforced)` vs
+`(advisory)`) plus how many agents were actually sandbox-enforced. It also raises
 warnings: missing metrics, many null results, interrupted agents, unphased /
-unlabeled agents, a single phase with a huge fan-out, and agents left on inherited
-or model-default effort.
+unlabeled agents, a single phase with a huge fan-out, agents left on inherited
+or model-default effort, and `read-only` labels that lack enforcement evidence
+(pre-enforcement journals or cached replays).
 
 When a run directory holds several journals, `summarize-run` — like `view-run` and
 `map-run` — defaults to the **most recently modified**; **`--list`** shows them all
@@ -366,7 +403,8 @@ What each source contributes (all optional except the journal):
   and **interrupted** agents (a `start` with no matching `end`).
 - **`<name>.result.json`** — the workflow's return value, for `--include-result`.
 - **`<name>.meta.json`** — run-level facts the journal can't carry (budget + meter,
-  pinned model, effort policy, the advisory sandbox label — plus `pid` /
+  pinned model, effort policy, the sandbox label with its `sandboxEnforcement`
+  verdict (`"enforced"` for read-only, `"advisory"` otherwise) — plus `pid` /
   `startedAt` / `script` / `runId`, which `fleet status` uses to tell a live run
   from a finished or killed one), written once by `run-workflow` at startup
   (best-effort; runtime-only, git-ignored). Absent → the budget line is simply
@@ -516,8 +554,9 @@ A persisted script written for Claude Code rarely needs editing to run here:
 
 ### `agent(prompt, opts)` options
 
-`schema`, `model`, `agentType`, `effort`, `sandbox` (advisory), `cwd`,
-`systemPrompt`, `personality`, `isolation`, `retries`, `timeoutMs`, `label`,
+`schema`, `model`, `agentType`, `effort`, `sandbox` (`read-only` enforced;
+other values advisory — see *Sandbox enforcement*), `cwd`, `systemPrompt`,
+`personality`, `isolation`, `retries`, `timeoutMs`, `label`,
 `phase`. Per-call `opts` override the CLI `--model/--effort/--sandbox/--retries`
 defaults — except that `--frontier`/`--pin-model` force the model and
 `--pin-effort` forces the effort regardless of `opts`. A per-call `effort`
@@ -536,7 +575,10 @@ the journal, rendered by the viewer), **model translation + configured-model
 preflight** (`kimi provider list --json`), **`agentType`** resolution,
 **retry-with-backoff** with permanent-error fast-fail, an **isolated `node:vm`
 script sandbox** (no fs/shell/process/fetch/import; non-deterministic builtins
-blocked), **`isolation:'worktree'`**, the **resume journal** (`--resume`), the
+blocked), **`isolation:'worktree'`**, **enforced `sandbox:'read-only'`**
+(worktree-isolated cwd + hard preamble + fast refusal + enforced-vs-advisory
+journaling, locked down by `test/sandbox-enforcement.test.js`), the **resume
+journal** (`--resume`), the
 **named-workflow registry** (`workflow("name")` → `.claude/workflows/` then
 `~/.claude/workflows/`), **`--plan` dry-run estimation**, **`--budget-meter
 total|output`**, **`--watch` live viewers**, the **`summarize-run`
@@ -554,10 +596,10 @@ the verified wire contract.
 
 **Extension points (not yet wired):**
 
-- **Sandbox enforcement** — `--sandbox`/`sandbox` are advisory labels; kimi 0.23.3
-  offers no headless permission surface to bind them to. A real approximation
-  (read-only worktrees, tmp cwds, refusing values that can't be honored) is
-  future work.
+- **A hard sandbox boundary** — enforced `read-only` is runner-side containment
+  (worktree cwd + preamble), not an OS/kernel sandbox: absolute paths, shell
+  side effects, and network access remain open. Binding to a real permission
+  surface has to wait for kimi to expose one headlessly.
 - **Real token usage** — all token numbers are ~4-chars/token estimates over
   prompt + final text; if a future kimi exposes per-turn usage in stream-json,
   the meter can switch to it without touching the workflow surface.
