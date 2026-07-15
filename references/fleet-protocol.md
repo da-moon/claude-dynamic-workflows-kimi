@@ -5,7 +5,7 @@ skill mode) is not coupled to this runner's internals. It is a **file
 contract**: a run is supervisable if it writes a handful of sidecar files next
 to a journal, and steerable if it polls one more. This document specifies that
 contract precisely enough to implement a new producer (another runner, a raw
-`codex` session wrapper, any long-running agent job) or a new consumer (a
+`kimi` session wrapper, any long-running agent job) or a new consumer (a
 different dashboard, a notifier, an autoscaler).
 
 Everything here is what `runner/bin/run-workflow.js` writes and
@@ -52,7 +52,7 @@ status`.
   "pid": 4242, "startedAt": 1765400000000,
   "script": "/abs/path/to/script", "runId": "alpha" ,
   "budget": 1500000, "budgetMeter": "total",
-  "model": "gpt-5.6-sol", "autoEffort": true, "pinEffort": null,
+  "model": "kimi-code/kimi-for-coding", "autoEffort": true, "pinEffort": null,
   "sandbox": "read-only", "interactive": true
 }
 ```
@@ -73,7 +73,7 @@ run may re-record). Three key namespaces:
 
 ```jsonc
 {"key":"<hash>#<occ>",      "label":"sweep:auth", "result":…, "phase":"Sweep",
- "model":"gpt-5.6-sol", "effort":"high", "tokens":512000, "ms":93000}  // one-shot agent
+ "model":"kimi-code/kimi-for-coding", "effort":"high", "tokens":512000, "ms":93000}  // one-shot agent
 {"key":"sess:s1#2",         "label":"investigator", "result":…, "session":true,
  "sessionId":"s1", "turn":2, "status":"completed", "threadId":"…",
  "promptHash":"…", "tokens":…, "ms":…}                                 // session turn

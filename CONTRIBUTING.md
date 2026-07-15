@@ -5,7 +5,15 @@ Thanks for your interest! This is a small, dependency-free project -- easy to ha
 ## Layout
 
 - `SKILL.md` -- the Claude Code skill definition (what Claude reads when the skill loads).
-- `.claude-plugin/plugin.json` -- Claude Code plugin manifest.
+  It lives at the repo root on purpose: this is the single-skill *plugin-root* layout, where
+  the plugin directory itself is the skill (the frontmatter `name: kimi-workflows` is
+  load-bearing for that layout -- don't remove it).
+- `.claude-plugin/plugin.json` -- Claude Code plugin manifest. It intentionally has **no
+  `version` field** (`claude plugin validate` warns about this; the warning is accepted):
+  with no version, the installed plugin version falls back to the git SHA, so **every push
+  is a new version** and `/plugin` updates always pick up the latest commit. Don't add a
+  static semver -- a stale number would mask pushed changes -- unless you also wire a
+  release step that bumps it (and root `package.json`) on every release.
 - `.claude-plugin/marketplace.json` -- Claude Code marketplace bundle manifest.
 - `runner/` -- the standalone runner (Node, zero deps):
   - `src/` -- the seam (`kimiAgent.js` + `kimiSession.js` for sessionful workers) + provider-neutral DSL (`runtime.js`), and helpers (model mapping, agentTypes, journal, worktree, meter).
@@ -16,7 +24,7 @@ Thanks for your interest! This is a small, dependency-free project -- easy to ha
   - `test/` -- `offline.js` (unit), `kimi-session.test.js` (session driver + chaos), `view-run.test.js` / `view-run.live.test.js` / `map-run.test.js` / `summarize-run.test.js` (viewer + summary robustness across run shapes), `serve.test.js` (cockpit channel), `fleet.test.js` (fleet status/answer + the agent-supervisor loop), `goal-lint.plan.test.js` / `claim-check.plan.test.js` (harness-zoo dry runs), `supervise.test.js` (the second fleet-protocol producer), `compare-runs.test.js` (across-runs analytics), `examples.plan.test.js` (every bundled workflow stays `--plan`-safe), `handshake.js` (live Kimi connectivity).
 - `references/` -- `authoring.md` (workflow-script DSL), `runner-readme.md` (architecture / Kimi prompt mapping / faithfulness), `fleet-protocol.md` (the sidecar contract that makes runs supervisable -- implement it to add a new producer/consumer).
 - `examples/` -- runnable templates and a bundled `demo/` run.
-- `bin/kimi-workflows.js` -- the npx/git-install dispatcher (`run` / `fleet` / `view` / `map` / `summarize` / `doctor`).
+- `bin/kimi-workflows.js` -- the npx/git-install dispatcher (`run` / `fleet` / `supervise` / `view` / `map` / `summarize` / `compare` / `doctor`).
 - `scripts/sync-skill.js` -- one-command sync of the skill surface to `~/.claude/skills/kimi-workflows` (`npm run sync-skill`).
 
 ## Develop
