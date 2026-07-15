@@ -184,7 +184,7 @@ One thing you *don't* tune: it's always **one frontier model for every agent** �
 /kimi-workflows  Find every call of legacyFetch() and migrate it to the new client, then apply the edits
 
 # Harden a goal — lint a vague /goal into a precise, testable one before you spend a fleet (goal_lint)
-/kimi-workflows  Harden this Codex goal before I run it
+/kimi-workflows  Harden this Kimi goal before I run it
 
 # Claim-check — verify a draft's claims against the actual repo, refute the unsupported ones (claim_check)
 /kimi-workflows  Verify this blog draft against the repo
@@ -316,7 +316,7 @@ Prefer the terminal? The same run renders as the **ASCII map** shown above — t
 Make this the default reflex. Before handing a serious `/goal` to Kimi — especially anything touching research claims, benchmarks, repo edits, evals, or "is this result real?":
 
 ```text
-/kimi-workflows quick Harden this Codex goal before I run it:
+/kimi-workflows quick Harden this Kimi goal before I run it:
 [paste your /goal]
 ```
 

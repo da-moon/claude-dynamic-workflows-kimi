@@ -1,11 +1,11 @@
 // Deep research over a codebase — the shape of Claude Code's bundled
-// /deep-research workflow, re-hosted on Codex: fan out investigators across
+// /deep-research workflow, re-hosted on Kimi: fan out investigators across
 // several angles, cross-check (vote on) every claim they surface, then a single
 // synthesizer writes a cited report from only the claims that survived.
 //
 // This version researches a CODE question in a read-only repo sandbox, so it runs
 // anywhere without web access. For a web-enabled variant, change the investigator
-// instructions to "search the web and fetch sources" (requires a Codex with web
+// instructions to "search the web and fetch sources" (requires a Kimi with web
 // tools) — the fan-out / verify / synthesize structure is identical.
 //
 //   node runner/bin/run-workflow.js examples/deep-research.workflow.js --frontier --auto-effort --sandbox read-only \

@@ -4,7 +4,7 @@ Two variants hunt the **same goal** on **different bets** — `hunt-deep` (one
 long-lived investigator, steered between rounds on a warm thread) and
 `hunt-wide` (independent sweeps over evidence angles + refute-by-default
 verification). They run **concurrently in this directory**, and a supervisor —
-a human in a second terminal, or Claude itself via `/codex-workflows --multi` —
+a human in a second terminal, or Claude itself via `/kimi-workflows --multi` —
 runs the loop: poll, answer, steer, kill, fork, synthesize.
 
 Nothing here is fleet-*specific* machinery: it's the ordinary runner plus three
@@ -99,6 +99,6 @@ from independent harnesses; where they conflict, the refuted/killed side is a
 finding too. To size everything first: both scripts are `--plan`-safe (the
 checkpoints answer themselves with their defaults; no tokens spent).
 
-The `/codex-workflows --multi` skill mode runs this entire loop for you —
+The `/kimi-workflows --multi` skill mode runs this entire loop for you —
 Claude compiles the variants, launches them, answers the gates with its full
 conversation context, and writes the cross-variant synthesis.

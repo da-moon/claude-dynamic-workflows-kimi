@@ -136,7 +136,7 @@ node runner/bin/run-workflow.js examples/harness-zoo/claim-check/claim-check.wor
 
 Via the skill, just describe it:
 
-> `/codex-workflows fact-check examples/harness-zoo/claim-check/sample-doc.md against this repo and give me a proof ledger`
+> `/kimi-workflows fact-check examples/harness-zoo/claim-check/sample-doc.md against this repo and give me a proof ledger`
 
 **Size it first** with a no-token dry run:
 

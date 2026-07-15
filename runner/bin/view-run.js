@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // view-run.js — generate a polished, self-contained HTML viewer for a
-// codex-workflows run, with progressive disclosure: Run → Phase → Agent → full
+// kimi-workflows run, with progressive disclosure: Run → Phase → Agent → full
 // structured result.
 //
 // Data sources (all self-contained in the run directory; no transcript needed):
@@ -109,7 +109,7 @@ function renderHtml(runModel, live = false, gen = 0) {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>${escapeHtml(runModel.name)} · codex-workflows run</title>
+<title>${escapeHtml(runModel.name)} · kimi-workflows run</title>
 <style>${CSS}</style>
 </head>
 <body>
@@ -601,7 +601,7 @@ function liveSettle(){
 // the old state-preserving reload loop, so live still works — just less smoothly.
 function scheduleLiveReloadFallback(){
   if(typeof window==='undefined'||window.__wfReload) return;
-  console&&console.warn&&console.warn('codex-workflows: live sidecars unavailable — falling back to reload');
+  console&&console.warn&&console.warn('kimi-workflows: live sidecars unavailable — falling back to reload');
   window.__wfReload=setInterval(()=>{
     if(!LIVE) return;
     if(panning||(Date.now()-__lastInteract)<1600) return;
@@ -1068,7 +1068,7 @@ function svgEl(tag,attrs){const e=document.createElementNS(SVGNS,tag);if(attrs)f
 function renderHeader(){
   const head=h('header',{});
   head.append(h('div',{class:'brandrow'},
-    h('span',{class:'brand'},'codex·workflows / run viewer'),
+    h('span',{class:'brand'},'kimi·workflows / run viewer'),
     h('span',{class:'runname'},RUN.name),
     h('div',{class:'toggles'},
       h('div',{class:'toggle'},

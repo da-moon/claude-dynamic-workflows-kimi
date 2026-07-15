@@ -20,7 +20,7 @@
 //   # unattended (CI): pre-answer the gate — no pause at all
 //   ... --args '{"topic":"…","checkpointAnswers":{"scope":"exclude"}}'
 //
-// Runs under --plan (human() returns its default; no Codex, no tokens).
+// Runs under --plan (human() returns its default; no Kimi, no tokens).
 
 export const meta = {
   name: "human-gate",

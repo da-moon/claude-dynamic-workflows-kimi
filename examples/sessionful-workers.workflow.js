@@ -1,4 +1,4 @@
-// Sessionful workers: spawn long-lived Codex workers, wait for the first to become
+// Sessionful workers: spawn long-lived Kimi workers, wait for the first to become
 // actionable, and let a CONTROLLER agent (not the human) decide whether to accept,
 // steer the same worker on its existing thread, ask the human, or stop.
 //
@@ -15,13 +15,13 @@
 //     --args '{"goal":"Audit auth","areaA":"auth middleware","areaB":"route handlers"}'
 //
 // Patterns: start → waitAny → controller decision → steer (same thread) → wait.
-// Runs under --plan with no Codex: planned sessions return schema skeletons and the
+// Runs under --plan with no Kimi: planned sessions return schema skeletons and the
 // planned controller decision is "accept", so the whole orchestration executes
 // without spending tokens. The steer / ask_human branches activate in real runs.
 
 export const meta = {
   name: "sessionful-worker-demo",
-  description: "Spawn long-lived Codex workers; a controller accepts / steers / asks / stops",
+  description: "Spawn long-lived Kimi workers; a controller accepts / steers / asks / stops",
   phases: [
     { title: "Explore", detail: "start two read-only workers; wait for the first result" },
     { title: "Control", detail: "a controller agent decides the next action" },

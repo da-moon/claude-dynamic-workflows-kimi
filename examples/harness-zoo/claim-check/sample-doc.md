@@ -1,4 +1,4 @@
-# claude-dynamic-workflows-codex (sample document under review)
+# claude-dynamic-workflows-kimi (sample document under review)
 
 This is a small "before" document — the kind of README/blurb ClaimCheck is built to
 audit. It makes several factual claims about *this* repository. Some hold up against

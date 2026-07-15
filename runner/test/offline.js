@@ -1,4 +1,4 @@
-// Offline unit checks for the provider-neutral pieces — no app-server, no tokens.
+// Offline unit checks for the provider-neutral pieces — no kimi binary, no tokens.
 // Covers the comment-shadowing regression and parallel/pipeline semantics.
 
 import assert from "node:assert/strict";
@@ -605,7 +605,7 @@ const exec = promisify(execFile);
 
 // ── Sessionful workers (agent.start / agent.waitAny / session.*) ─────────────
 // A fake session driver stands in for kimiSession.startKimiSession via the
-// `startSession` seam, so these run with NO app-server and NO tokens. Each turn
+// `startSession` seam, so these run with NO kimi binary and NO tokens. Each turn
 // "completes" after a small delay parsed from the prompt (delay=NN ms), or is
 // interrupted on demand — enough to exercise start/wait/waitAny/steer/cancel/close.
 function makeFakeSessionFactory() {

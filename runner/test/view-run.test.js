@@ -1,4 +1,4 @@
-// Robustness test for the run viewer: generates synthetic codex-workflows runs
+// Robustness test for the run viewer: generates synthetic kimi-workflows runs
 // covering the shapes a real run can take, builds a viewer for each, and smoke-
 // renders it (map + tree + both themes + a drawer) in a fake DOM. No tokens, no
 // browser. Exits non-zero if any shape fails to render.

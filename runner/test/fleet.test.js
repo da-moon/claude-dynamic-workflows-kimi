@@ -1,4 +1,4 @@
-// Fleet supervision checks — the agent-supervisor loop, no Codex, no tokens.
+// Fleet supervision checks — the agent-supervisor loop, no Kimi, no tokens.
 //
 //  1. inspectRun's state machine (completed / running / stopped / stalled /
 //     waiting-on-answer) against staged fixtures, with clock + pid-liveness
@@ -158,7 +158,7 @@ try {
   assert.deepEqual(lines2[lines2.length - 1].answer, { go: true }, "--answer-json parses structured answers");
   assert.equal(run(["answer", "--journal", J("live.workflow.jsonl"), "--id", "scope", "--answer", "{bad", "--answer-json"]).status, 1);
 
-  // ── 3 · end-to-end: supervise a real run (no Codex, no tokens) ─────────────
+  // ── 3 · end-to-end: supervise a real run (no Kimi, no tokens) ─────────────
   const gdir = join(ROOT, "gate");
   mkdirSync(gdir, { recursive: true });
   writeFileSync(join(gdir, "gate.workflow.js"), `export const meta = { name: 'gate-demo', description: 'a supervisor gate, zero agents', phases: [{ title: 'Gate' }] }

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// demo-live.js — one command: run an example workflow on Codex and watch it build
+// demo-live.js — one command: run an example workflow on Kimi and watch it build
 // as a live ASCII map in this terminal. Wires run-workflow.js (which writes the
 // journal as agents finish) to map-run.js --watch (which redraws it), both pointed
 // at the same journal. The live map exits on its own when the run finishes.
 //
-// Needs a logged-in `codex` CLI (it uses --frontier) and spends a small amount of
+// Needs a configured `kimi` CLI (it uses --frontier) and spends a small amount of
 // tokens (the default example is ~3 agents). Run it from a real terminal.
 //
 //   node bin/demo-live.js [--script PATH] [--args JSON] [--budget N]
@@ -38,9 +38,9 @@ const opts = parse(process.argv);
 if (opts.help) {
   console.log(
     "usage: demo-live [--script PATH] [--args JSON] [--budget N]\n" +
-      "  Run an example workflow on Codex and watch it build as a live ASCII map.\n" +
+      "  Run an example workflow on Kimi and watch it build as a live ASCII map.\n" +
       "  Defaults to examples/market-news.workflow.js (gathers today's US market news;\n" +
-      "  the agents use live web access). Needs `codex login`.",
+      "  the agents use live web access). Needs a configured `kimi` CLI.",
   );
   process.exit(0);
 }
@@ -56,7 +56,7 @@ writeFileSync(journal, ""); // pre-create so the watcher can attach immediately
 const wfLog = join(dir, "workflow.log");
 const color = process.stdout.isTTY && !process.env.NO_COLOR;
 
-console.error(`▶ running ${basename(script)} on Codex`);
+console.error(`▶ running ${basename(script)} on Kimi`);
 console.error(`  journal: ${journal}`);
 console.error(`  log:     ${wfLog}`);
 

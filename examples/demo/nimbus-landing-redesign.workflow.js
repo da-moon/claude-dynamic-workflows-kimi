@@ -1,10 +1,10 @@
 // A complete, self-contained demo workflow over a FICTIONAL product ("Nimbus").
 // It ships with a pre-baked result journal so you can open the viewer with no
-// Codex calls:
+// Kimi calls:
 //
 //   node runner/bin/view-run.js examples/demo --open
 //
-// To run it for real against your local Codex App Server:
+// To run it for real against your local Kimi CLI:
 //
 //   node runner/bin/run-workflow.js examples/demo/nimbus-landing-redesign.workflow.js --frontier
 //

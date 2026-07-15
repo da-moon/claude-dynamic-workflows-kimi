@@ -20,6 +20,11 @@ node runner/bin/summarize-run.js .          # By-phase + Sessionful workers tabl
 
 ### Measured result (2026-06-09 · codex 0.137.0 · gpt-5.5 · effort medium · corpus `runner/src`, ~3.3k lines · 3 questions)
 
+> Historical measurement, taken on the original Codex backend **before the Kimi
+> port** (the runner now rides `kimi -S` persisted sessions, and the seam file is
+> `kimiAgent.js`). Treat the numbers as order-of-magnitude; re-run the workflow
+> above to measure your own Kimi setup.
+
 | | tokens | wall time |
 | :--- | ---: | ---: |
 | **Warm** — ingest (one-time, turn 0) | 329k | 80s |

@@ -16,7 +16,7 @@
 //     --frontier --effort medium --sandbox read-only \
 //     --args '{"scope":"runner/src","questions":["…","…","…"]}'
 //
-// Runs under --plan (no Codex, no tokens): counts 1 ingest + N steers + N cold agents.
+// Runs under --plan (no Kimi, no tokens): counts 1 ingest + N steers + N cold agents.
 
 export const meta = {
   name: "warm-vs-cold",

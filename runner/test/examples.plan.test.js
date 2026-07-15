@@ -1,5 +1,5 @@
 // The docs promise every bundled workflow is `--plan`-safe ("dry-run any with
-// --plan, no Codex, no tokens"). Enforce it: a no-arg plan-mode run of EVERY
+// --plan, no Kimi, no tokens"). Enforce it: a no-arg plan-mode run of EVERY
 // examples/**/*.workflow.js must exit 0. Catches a DSL break, a script that
 // forgot to default its args, or a meta typo — for the whole template library,
 // in one sweep. (Found by the --multi rehearsal's claims-sweep: the promise

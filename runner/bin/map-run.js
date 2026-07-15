@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// map-run.js — render a codex-workflows run as an ASCII execution map in the
+// map-run.js — render a kimi-workflows run as an ASCII execution map in the
 // terminal. With --watch it redraws in place as the journal grows, so you get a
 // live map of a run without leaving the shell (the terminal analogue of
 // view-run.js --watch).

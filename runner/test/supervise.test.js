@@ -1,6 +1,6 @@
 // The `supervise` shim is the fleet protocol's reference SECOND producer: any
 // command wrapped in it must be fully supervisable by the same tools as a
-// workflow run. Proven here end-to-end with a real bash job — no Codex:
+// workflow run. Proven here end-to-end with a real bash job — no Kimi:
 //
 //   1. the wrapped job appears in `fleet status` (running, correct pid),
 //   2. its @@ASK line becomes a pending question, pushed via --notify-cmd,

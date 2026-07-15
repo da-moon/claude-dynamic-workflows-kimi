@@ -1,5 +1,5 @@
 // Plan-mode smoke test for the ClaimCheck harness-zoo template. A --plan dry run
-// executes the orchestration with agent() stubbed (schema skeletons) — no Codex, no
+// executes the orchestration with agent() stubbed (schema skeletons) — no Kimi, no
 // tokens — so this verifies the phase/agent shape, that the script survives skeleton
 // outputs, and that it still returns a structured JSON + Markdown proof ledger.
 // (Mirrors the runtime --plan mechanics covered in offline.js, but against the real

@@ -14,7 +14,7 @@
 // The bundled run under .workflow-journal/ is what `npm run demo` opens. To run it
 // for real:  node runner/bin/run-workflow.js examples/incident-demo/checkout-incident.workflow.js \
 //              --frontier --auto-effort --sandbox read-only --gui
-// Runs under --plan (no Codex, no tokens): human() returns its default; the race is counted.
+// Runs under --plan (no Kimi, no tokens): human() returns its default; the race is counted.
 
 export const meta = {
   name: "checkout-incident",

@@ -1,6 +1,6 @@
 // Integration checks for the live cockpit channel: `view-run --serve` serves the
 // page + sidecars over 127.0.0.1 and accepts POST /answer for the workflow's
-// human() questions (appended to the answers sidecar the runner polls). No Codex,
+// human() questions (appended to the answers sidecar the runner polls). No Kimi,
 // no tokens — a fixture journal and a real local HTTP round-trip.
 //
 //   node test/serve.test.js

@@ -1,7 +1,7 @@
 // compare-runs: the across-runs analytics view. Fixtures cover run-id
 // grouping, newest-first ordering, the latest-vs-previous token trend,
 // by-design nulls not denting the completion rate, budget/null flags, empty
-// journals skipped, and the CLI's --json shape. No Codex, no tokens.
+// journals skipped, and the CLI's --json shape. No Kimi, no tokens.
 //
 //   node test/compare-runs.test.js
 
