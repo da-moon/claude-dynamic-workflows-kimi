@@ -34,6 +34,8 @@ jobs:
       # renderer -- with no credentials or model spend.
       - name: Offline unit checks
         run: node runner/test/offline.js
+      - name: Spawn boundary (argv contract + stream-json parser, fake kimi)
+        run: node runner/test/kimi-agent.spawn.test.js
       - name: Session driver (chaos + warm resume)
         run: node runner/test/kimi-session.test.js
       - name: Run-viewer robustness (all shapes)
