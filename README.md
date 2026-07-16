@@ -234,7 +234,7 @@ The classic **find → adversarially-verify** shape, and the reason to use a fle
 
 > `/kimi-workflows  Read everything under packages/core into one worker, then I'm going to ask it a stream of questions — keep it warm.`
 
-This is the **sessionful** superpower the native one-shot DSL can't do. One worker ingests the corpus **once** (`agent.start`); every follow-up is a `session.steer` on the *same warm thread* — it answers from context instead of re-reading. Measured on this repo's own source: after the one-time load, follow-ups cost **~69k tokens in ~6s each** versus **~219k and ~97s** for a cold agent re-reading every time — **~3× cheaper, ~16× faster per question** ([benchmark](examples/benchmarks)). Works for a data room, a contract set, a spec bundle, a log archive — anything you'll question more than twice.
+This is the **sessionful** superpower the native one-shot DSL can't do. One worker ingests the corpus **once** (`agent.start`); every follow-up is a `session.steer` on the *same warm thread* — it answers from context instead of re-reading. Measured on this repo's own source (kimi-code 0.23.3): after the one-time load, each follow-up ran **~1.6× cheaper in (estimated) tokens and ~1.8× faster per turn** than a cold re-read, with the warm arm's cumulative tokens ahead by the second question ([benchmark + measurement caveats](examples/benchmarks)). (An earlier pre-port GPT-5.5 run measured ~3×/~16×, but its token accounting is not comparable.) Works for a data room, a contract set, a spec bundle, a log archive — anything you'll question more than twice.
 
 ### 4 · Throw several strategies at one stubborn bug
 
@@ -456,7 +456,7 @@ for (const s of first.pendingSessions) await s.cancel();           // stop the l
 - **Race and cut losers** — fire several strategies at one problem, keep the first that works, cancel the rest.
 - **Follow the evidence** — a controller agent chases the strongest lead instead of a question list frozen at author time.
 
-**Measured, not asserted** ([`examples/benchmarks/`](examples/benchmarks)): on this repo's own source (gpt-5.5, effort medium), a warm worker answered follow-up questions for **~69k tokens in ~6s each** after a one-time 329k ingest, while cold one-shots paid **~219k tokens and ~97s per question** re-reading the corpus every time — **~3× cheaper and ~16× faster per question**, breaking even on cumulative tokens by the third question (the per-question wall-clock gap is decisive from the first).
+**Measured, not asserted** ([`examples/benchmarks/`](examples/benchmarks)): on the current Kimi backend (kimi-code 0.23.3, effort medium), a warm worker answered each follow-up **~1.6× cheaper in (estimated) tokens and ~1.8× faster per turn** than cold one-shots, cumulative tokens ahead by the second question. (The pre-port GPT-5.5 run measured ~3×/~16×, but its token accounting is not comparable — see the benchmark README's caveats.)
 
 **Runnable examples** (all `--plan`-safe — dry-run any with `--plan`, no Kimi, no tokens):
 `sessionful-workers` (the intro) · `warm-context-interrogation` (load once, ask many) · `hedged-take-first-win` (race + cancel) · `flaky-bug-perturbation` (hold a repro, perturb it) · `lead-following-research` (controller chases leads) · `stateful-dialogue` (memory vs. a cold judge) · `agent-foreman` (supervised autonomy, escalate at forks) · `human-gate` (pause at a declared fork, answer in the live viewer, steer the warm worker).
