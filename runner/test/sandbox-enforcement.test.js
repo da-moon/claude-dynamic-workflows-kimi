@@ -19,7 +19,8 @@
 //   - workspace-write / danger-full-access -> advisory: behavior identical to
 //                        the default (same argv shape, same cwd, no preamble)
 //   - journal + summary distinguish enforced vs advisory per agent, and the CLI
-//     refuses --sandbox typos / unenforceable read-only runs at startup.
+//     refuses --sandbox typos / unenforceable read-only runs (non-repo cwd OR a
+//     repo with no commits — worktrees detach at HEAD) at startup.
 
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -79,11 +80,16 @@ process.env.KIMI_FAKE_ARGV = argvLog;
 process.env.KIMI_FAKE_FIXTURE = FIXTURE;
 delete process.env.KIMI_FAKE_WRITE;
 
-// A real git repo (the tree read-only agents must not touch) and a non-repo dir.
+// A real git repo (the tree read-only agents must not touch), a non-repo dir,
+// and an EMPTY repo (git init, zero commits — unborn HEAD, so a detached
+// worktree at HEAD cannot be created).
 const repoDir = join(base, "repo");
 const plainDir = join(base, "plain");
+const emptyRepoDir = join(base, "empty-repo");
 await mkdir(repoDir);
 await mkdir(plainDir);
+await mkdir(emptyRepoDir);
+execFileSync("git", ["init", "-q"], { cwd: emptyRepoDir, stdio: "pipe" });
 const git = (args) => execFileSync("git", args, { cwd: repoDir, stdio: "pipe" });
 git(["init", "-q"]);
 git(["config", "user.email", "t@example.com"]);
@@ -293,8 +299,20 @@ try {
     });
     assert.equal(nonRepo.status, 1, "--sandbox read-only outside a git repo exits 1");
     assert.match(nonRepo.stderr, /read-only: cannot be enforced here/, "startup refusal is explicit");
-    assert.equal(existsSync(argvLog), false, "no agent was spawned by either refusal");
-    console.log("  ✓ CLI: --sandbox typo and unenforceable read-only refused at startup");
+
+    // An EMPTY repo (unborn HEAD) is just as unenforceable — worktree creation
+    // would fail on the first agent call. It must be refused at startup too,
+    // before journals or monitors, in the same style as the non-repo refusal.
+    const emptyRepo = spawnSync(process.execPath, [RUN_WORKFLOW, script, "--sandbox", "read-only", "--no-journal"], {
+      cwd: emptyRepoDir, env: envBase, encoding: "utf8", timeout: 30_000,
+    });
+    assert.equal(emptyRepo.status, 1, "--sandbox read-only in a commitless repo exits 1");
+    assert.match(emptyRepo.stderr, /read-only: cannot be enforced here/, "startup refusal, same style as the non-repo one");
+    assert.match(emptyRepo.stderr, /no commits/, "refusal names the actual reason (unborn HEAD)");
+    assert.match(emptyRepo.stderr, /initial commit/, "refusal is actionable");
+
+    assert.equal(existsSync(argvLog), false, "no agent was spawned by any refusal");
+    console.log("  ✓ CLI: --sandbox typo, non-repo, and commitless-repo read-only all refused at startup");
   }
 
   console.log("sandbox-enforcement.test: all checks passed");

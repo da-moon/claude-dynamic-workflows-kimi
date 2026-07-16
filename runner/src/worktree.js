@@ -26,6 +26,19 @@ export async function isGitRepo(cwd) {
   }
 }
 
+// Whether the repo containing `cwd` has a commit at HEAD. A freshly-`git init`ed
+// repo has an unborn HEAD, so `worktree add --detach … HEAD` fails — callers that
+// need worktree isolation (enforced read-only) can probe this up front and refuse
+// fast instead of failing on the first agent call.
+export async function hasHeadCommit(cwd) {
+  try {
+    await git(cwd, ["rev-parse", "--verify", "-q", "HEAD^{commit}"]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Create a detached worktree at HEAD of the repo containing `repoCwd`.
  * Returns { dir, cleanup }, where cleanup({ discard }) removes the worktree and

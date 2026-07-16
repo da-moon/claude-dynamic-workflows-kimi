@@ -253,7 +253,8 @@ else if (opts.autoEffort) {
 // first-class default). With a value: validate the spelling up front, and refuse
 // an unhonorable `read-only` FAST — before journals, monitors, or any spawn —
 // since read-only is enforced via detached-worktree cwd isolation, which needs
-// a git repo. workspace-write / danger-full-access stay advisory labels.
+// a git repo WITH at least one commit (worktrees detach at HEAD).
+// workspace-write / danger-full-access stay advisory labels.
 const SANDBOXES = new Set(["read-only", "workspace-write", "danger-full-access"]);
 if (opts.sandbox && !SANDBOXES.has(opts.sandbox)) {
   console.error(`--sandbox: unknown value '${opts.sandbox}' (expected ${[...SANDBOXES].join("|")}; omit the flag for the default full-auto mode)`);
@@ -261,11 +262,19 @@ if (opts.sandbox && !SANDBOXES.has(opts.sandbox)) {
 }
 if (opts.sandbox && !opts.plan) {
   if (opts.sandbox === "read-only") {
-    const { isGitRepo } = await import("../src/worktree.js");
+    const { isGitRepo, hasHeadCommit } = await import("../src/worktree.js");
     if (!(await isGitRepo(process.cwd()))) {
       console.error(
         "--sandbox read-only: cannot be enforced here — the working directory is not a git repository, so\n" +
           "detached-worktree isolation is unavailable. Run from a git checkout, or drop --sandbox to run\n" +
+          "full-auto (the default).",
+      );
+      process.exit(1);
+    }
+    if (!(await hasHeadCommit(process.cwd()))) {
+      console.error(
+        "--sandbox read-only: cannot be enforced here — the repository has no commits (unborn HEAD), so\n" +
+          "a detached worktree at HEAD cannot be created. Make an initial commit, or drop --sandbox to run\n" +
           "full-auto (the default).",
       );
       process.exit(1);
