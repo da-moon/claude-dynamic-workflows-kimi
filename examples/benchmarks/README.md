@@ -47,8 +47,9 @@ mechanical, not a property of Kimi being cheaper:
 
 - The headless `kimi -p` CLI reports **no real per-turn token usage**. The
   runner estimates tokens as ~4 chars/token of the **literal prompt string
-  it sent plus the literal reply text** (`meter.js: estimateTokens`,
-  `kimiAgent.js:293-295`). It does **not** see (and cannot count) the tokens
+  it sent plus the literal reply text** (`estimateTokens` in `meter.js`,
+  called from `kimiAgent.js`'s turn-completion path in `runOneTurn`). It
+  does **not** see (and cannot count) the tokens
   Kimi's own agentic tool calls spend reading files under `runner/src` —
   that corpus-reading cost happens inside the Kimi process and is invisible
   to the runner's meter.
