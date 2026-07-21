@@ -142,7 +142,7 @@ The captured output above is preserved from a run on the original GPT-5.5
 backend (model chips as recorded). On Kimi, the skill deliberately does not
 route stages across model tiers: `--frontier` picks the strongest model
 **configured in your kimi CLI** (`kimi provider list` — e.g.
-`kimi-code/kimi-for-coding`) and pins the whole run to that one model.
+`kimi-code/k3`, the max-only frontier tier) and pins the whole run to that one model.
 
 ### Steering your run — just ask
 
@@ -565,7 +565,7 @@ Claude Code's workflow runtime is sealed inside its binary, so this is an **exte
 | session resume (`--resume`) | completed turns replay **free** from the journal; the worker re-attaches to its persisted session via `-S` |
 | `session.cancel()` | terminates the live kimi subprocess — the turn resolves `cancelled`, race losers stop billing |
 | `agentType: 'x'` | loads `.kimi/agents/x.md` (or `.claude/agents/x.md`) → the system prompt |
-| Claude model id / alias | mapped to a **configured** Kimi model (`kimi provider list`): opus/sonnet → `kimi-for-coding`, haiku → `kimi-for-coding-highspeed` |
+| Claude model id / alias | mapped to a **configured** Kimi model (`kimi provider list`): opus → `k3` (`kimi-code/k3`), sonnet/haiku → `kimi-for-coding-highspeed` |
 | sandbox / permissions | **full-auto** by default — headless `kimi -p` auto-approves every tool action; `sandbox:'read-only'` is **enforced** runner-side (worktree cwd + hard preamble; refused if unavailable), other values are advisory labels ([Safety](#safety)) |
 | transient errors | retry with backoff (default 3); permanent errors (unconfigured model, bad flags, config.invalid) fail fast |
 | `parallel` / `pipeline` / `phase` / `budget` | unchanged — provider-neutral JS |
@@ -579,7 +579,7 @@ Full internals, the protocol mapping, and a faithfulness comparison vs. the nati
 ## Requirements & compatibility
 
 - **Node ≥ 18.17**, zero npm dependencies (CI-tested on Node 20 and 24).
-- A logged-in **`kimi` CLI** on `PATH`. Built and verified against `kimi` **0.23.3** — the runner drives it via `kimi -p … --output-format stream-json`, and a version drift prints a warning, not an error. Verify your environment with `npm run doctor` (or `npx github:da-moon/claude-dynamic-workflows-kimi doctor`).
+- A logged-in **`kimi` CLI** on `PATH`. Built and tested against `kimi` **0.23.3**, with the `-p` wire contract verified compatible through **0.27.0** (the pinned `VERIFIED_KIMI_VERSION`) — the runner drives it via `kimi -p … --output-format stream-json`, and a version drift outside the known-compatible set prints a warning, not an error. Verify your environment with `npm run doctor` (or `npx github:da-moon/claude-dynamic-workflows-kimi doctor`).
 
 ## Safety
 

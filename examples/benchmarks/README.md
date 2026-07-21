@@ -14,17 +14,29 @@ Two arms answer the **same questions** about the **same corpus**:
 
 ```bash
 node runner/bin/run-workflow.js examples/benchmarks/warm-vs-cold.workflow.js \
-  --frontier --effort medium --sandbox read-only
+  --pin-model kimi-code/kimi-for-coding --effort medium --sandbox read-only
 node runner/bin/summarize-run.js .          # By-phase + Sessionful workers tables
 ```
+
+> **Note — this measurement predates the k3 tier.** When it was taken, `--frontier`
+> selected `kimi-code/kimi-for-coding` (the strongest model then configured), so the
+> recorded run was `kimi-for-coding` at `--effort medium`. On a current kimi-code
+> install `--frontier` selects the max-only **`kimi-code/k3`**, which has automatic
+> reasoning effort and **ignores `--effort`** — a plain `--frontier --effort medium`
+> run today would measure k3, not the numbers below. To reproduce the recorded run,
+> pin the model as shown above (`--pin-model kimi-code/kimi-for-coding --effort
+> medium`); to benchmark the current frontier instead, use `--frontier` and drop
+> `--effort` (it is a no-op for k3).
 
 ### Measured result (2026-07-15 · kimi-code 0.23.3 · kimi-code/kimi-for-coding · effort medium · corpus `runner/src`, ~4.1k lines · 3 questions)
 
 > Measured on the real Kimi backend, post-port (the runner rides `kimi -S`
-> persisted sessions; the seam file is `kimiAgent.js`). Run with
-> `--frontier --effort medium --sandbox read-only --budget 4000000
-> --run-id bench1`; completed in 1m32s wall-clock, 7/7 agents completed,
-> 0 retries.
+> persisted sessions; the seam file is `kimiAgent.js`). The original run used
+> `--frontier --effort medium`, which on kimi-code 0.23.3 selected
+> `kimi-code/kimi-for-coding` (this predates the k3 tier); to reproduce it now,
+> pin that model: `--pin-model kimi-code/kimi-for-coding --effort medium
+> --sandbox read-only --budget 4000000 --run-id bench1`. Completed in 1m32s
+> wall-clock, 7/7 agents completed, 0 retries.
 
 | | tokens (est.) | agent time |
 | :--- | ---: | ---: |

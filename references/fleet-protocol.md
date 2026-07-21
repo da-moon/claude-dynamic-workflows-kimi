@@ -52,7 +52,7 @@ status`.
   "pid": 4242, "startedAt": 1765400000000,
   "script": "/abs/path/to/script", "runId": "alpha" ,
   "budget": 1500000, "budgetMeter": "total",
-  "model": "kimi-code/kimi-for-coding", "autoEffort": true, "pinEffort": null,
+  "model": "kimi-code/k3", "autoEffort": true, "pinEffort": null,
   "sandbox": "read-only", "sandboxEnforcement": "enforced", "interactive": true
 }
 ```
@@ -73,7 +73,7 @@ run may re-record). Three key namespaces:
 
 ```jsonc
 {"key":"<hash>#<occ>",      "label":"sweep:auth", "result":…, "phase":"Sweep",
- "model":"kimi-code/kimi-for-coding", "effort":"high", "tokens":512000, "ms":93000}  // one-shot agent
+ "model":"kimi-code/k3", "effort":"high", "tokens":512000, "ms":93000}  // one-shot agent
 {"key":"sess:s1#2",         "label":"investigator", "result":…, "session":true,
  "sessionId":"s1", "turn":2, "status":"completed", "threadId":"…",
  "promptHash":"…", "tokens":…, "ms":…}                                 // session turn

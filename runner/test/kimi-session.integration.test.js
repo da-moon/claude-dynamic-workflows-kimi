@@ -48,7 +48,10 @@ const args = process.argv.slice(2);
 if (args[0] === "provider") {
   process.stdout.write(JSON.stringify({
     providers: { "managed:kimi-code": { type: "kimi" } },
-    models: { "kimi-code/kimi-for-coding": { provider: "managed:kimi-code", model: "kimi-for-coding" } },
+    models: {
+      "kimi-code/k3": { provider: "managed:kimi-code", model: "k3" },
+      "kimi-code/kimi-for-coding": { provider: "managed:kimi-code", model: "kimi-for-coding" },
+    },
   }) + "\\n");
   process.exit(0);
 }

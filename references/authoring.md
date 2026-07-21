@@ -68,7 +68,7 @@ a fresh `kimi -p <prompt> --output-format stream-json` subprocess per call.
 | opt | meaning |
 | --- | --- |
 | `schema` | JSON Schema (object root). Strict-normalized by the runner (every property `required`, `additionalProperties:false` — recursively) and **embedded in the prompt**; the reply is parsed leniently (`JSON.parse`, then a fenced/embedded-JSON fallback) and degrades to `null` if the model doesn't comply |
-| `model` | **Leave unset in scripts.** Runs are pinned to the strongest *configured* model with `--frontier`, which overrides any per-call `model` anyway. (If you do set it: usable ids are the ones configured in kimi — `kimi provider list --json`, e.g. `kimi-code/kimi-for-coding` — and Claude ids/aliases map `opus`/`sonnet` → `kimi-for-coding`, `haiku` → `kimi-for-coding-highspeed`; an unconfigured id falls back to kimi's own config default with a warning.) |
+| `model` | **Leave unset in scripts.** Runs are pinned to the strongest *configured* model with `--frontier`, which overrides any per-call `model` anyway. (If you do set it: usable ids are the ones configured in kimi — `kimi provider list --json`, e.g. `kimi-code/k3` — and Claude ids/aliases map `opus` → `k3` (`kimi-code/k3`), `sonnet`/`haiku` → `kimi-for-coding-highspeed`; an unconfigured id falls back to kimi's own config default with a warning.) |
 | `agentType` | name of a subagent in `.claude/agents/<name>.md`; its body becomes the system prompt, its frontmatter `model` a fallback |
 | `systemPrompt` | explicit developer instructions (overrides `agentType` body) |
 | `effort` | `none`/`minimal`/`low`/`medium`/`high`/`xhigh`. **Usually leave unset and run with `--auto-effort`**, which scales effort to each layer's parallel width (1→`xhigh`, 2+→`high` — the floor) so lone gate agents get the policy's extra-high tier while every fan-out still gets `high`. A per-call `effort` *overrides* the policy, so set it only as a deliberate exception. Precedence: `--pin-effort` > per-call `effort` > `--auto-effort` > `--effort` > unset (no effort hint at all). Effort reaches Kimi as a **prompt hint** (`(thinking effort: X)` prepended to the turn), not an API parameter — a strong steer, not a hard guarantee. |
@@ -424,10 +424,10 @@ web search if your Kimi has web tools).
   must `.filter(Boolean)`.
 - **One model, effort is the lever.** Usable models are the ones **configured in
   kimi** (`kimi provider list --json` — on a stock kimi-code install:
-  `kimi-code/kimi-for-coding` and `kimi-code/kimi-for-coding-highspeed`). Runs use
-  `--frontier`, which pins the strongest configured model (here
-  `kimi-code/kimi-for-coding`) and **overrides any per-call `model`** — so leave
-  `model` out of `agent()` opts. This is a deliberate divergence from the native
+  `kimi-code/k3` (the max-only frontier tier), `kimi-code/kimi-for-coding`, and
+  `kimi-code/kimi-for-coding-highspeed`). Runs use `--frontier`, which pins the
+  strongest configured model (here `kimi-code/k3`) and **overrides any per-call
+  `model`** — so leave `model` out of `agent()` opts. This is a deliberate divergence from the native
   blog's "classify-and-route to Sonnet vs Opus": instead of *model* routing for
   cost, this re-host keeps one model and uses **thinking effort** as the dial
   (`--auto-effort` scales it to layer width; `--effort`/`--pin-effort`/`--budget`

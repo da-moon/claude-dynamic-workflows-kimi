@@ -141,6 +141,30 @@ try {
     assert.equal(fakeCalls[0].opts.effort, undefined, "effort is embedded by the driver, never forwarded to the agent seam");
   }
 
+  // 6b) Effort suppression for k3 (mirrors #6's positive assertion). k3 is the
+  //     max-only frontier tier — automatic reasoning effort, no --effort knob —
+  //     so _buildPrompt must NOT embed a "(thinking effort: X)" hint for a k3
+  //     model, but MUST keep it for a non-k3 model given the same effort.
+  {
+    resetFake(["ok"]);
+    const k3 = new KimiSessionDriver({ model: "kimi-code/k3", systemPrompt: "sys", cwd: process.cwd(), runAgent: fakeKimiAgent });
+    await (await k3.beginTurn("go", { effort: "high" })).completion;
+    assert.doesNotMatch(
+      fakeCalls[0].prompt,
+      /\(thinking effort:/,
+      "k3 model: the effort hint is SUPPRESSED (max-only, automatic effort)",
+    );
+
+    resetFake(["ok"]);
+    const k2 = new KimiSessionDriver({ model: "kimi-k2", systemPrompt: "sys", cwd: process.cwd(), runAgent: fakeKimiAgent });
+    await (await k2.beginTurn("go", { effort: "high" })).completion;
+    assert.match(
+      fakeCalls[0].prompt,
+      /\(thinking effort: high\)/,
+      "non-k3 model: the effort hint is KEPT (same effort, only k3 is suppressed)",
+    );
+  }
+
   // 7) startKimiSession with replayPrefix rebuilds the transcript for warm resume:
   //    the first live turn prepends it (no session id was journaled).
   {

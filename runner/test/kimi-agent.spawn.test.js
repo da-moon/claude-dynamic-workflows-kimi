@@ -40,10 +40,12 @@ await writeFile(
 const fs = require("node:fs");
 const args = process.argv.slice(2);
 if (args[0] === "provider") {
-  // Shape of \`kimi provider list --json\` on kimi 0.23.3 (the CONFIGURED set).
+  // Shape of \`kimi provider list --json\` on kimi-code 0.27.0 (the CONFIGURED set),
+  // including the max-only k3 frontier tier that opus / --frontier now map onto.
   process.stdout.write(JSON.stringify({
     providers: { "managed:kimi-code": { type: "kimi" } },
     models: {
+      "kimi-code/k3": { provider: "managed:kimi-code", model: "k3" },
       "kimi-code/kimi-for-coding": { provider: "managed:kimi-code", model: "kimi-for-coding" },
       "kimi-code/kimi-for-coding-highspeed": { provider: "managed:kimi-code", model: "kimi-for-coding-highspeed" },
     },
@@ -104,7 +106,7 @@ try {
     const [args] = await promptCalls();
     const m = args.indexOf("--model");
     assert.notEqual(m, -1, "--model is passed for an explicit model");
-    assert.equal(args[m + 1], "kimi-code/kimi-for-coding", "opus -> configured id, provider-prefixed");
+    assert.equal(args[m + 1], "kimi-code/k3", "opus -> configured k3 frontier tier, provider-prefixed");
   }
 
   // 3) Pinned turn: pinnedModel overrides the per-call model and passes through
@@ -131,6 +133,40 @@ try {
     await kimiAgent("bill me", { retries: 0 });
     assert.ok(tokensSpent() > 0, "a completed turn records estimated tokens into the meter");
     resetMeter();
+  }
+
+  // 5) Effort suppression for k3. k3 is the max-only frontier tier: its reasoning
+  //    effort is automatic (no --effort knob), so buildFullPrompt must NOT prepend
+  //    a "(thinking effort: X)" hint when the RESOLVED model is k3 — but must keep
+  //    it for a non-k3 model given the SAME effort. Asserted on the real recorded
+  //    -p prompt, through resolveModel + buildFullPrompt + spawn.
+  {
+    // k3 arm: "opus" resolves onto the configured kimi-code/k3.
+    await rm(argvLog, { force: true });
+    await kimiAgent("investigate the crash", { model: "opus", effort: "high", retries: 0 });
+    const [k3Args] = await promptCalls();
+    assert.equal(k3Args[k3Args.indexOf("--model") + 1], "kimi-code/k3", "sanity: opus resolved to the k3 tier");
+    assert.doesNotMatch(
+      k3Args[1],
+      /\(thinking effort:/,
+      "k3 turn with effort:'high' -> the effort hint is SUPPRESSED (max-only, automatic effort)",
+    );
+
+    // non-k3 arm: "haiku" resolves onto kimi-code/kimi-for-coding-highspeed. Same
+    // effort, and the hint IS present — proving the suppression is k3-specific.
+    await rm(argvLog, { force: true });
+    await kimiAgent("investigate the crash", { model: "haiku", effort: "high", retries: 0 });
+    const [nonK3Args] = await promptCalls();
+    assert.equal(
+      nonK3Args[nonK3Args.indexOf("--model") + 1],
+      "kimi-code/kimi-for-coding-highspeed",
+      "sanity: haiku resolved to a non-k3 model",
+    );
+    assert.match(
+      nonK3Args[1],
+      /\(thinking effort: high\)/,
+      "non-k3 turn with the same effort KEEPS the '(thinking effort: high)' hint",
+    );
   }
 
   console.log("kimi-agent.spawn.test: all checks passed");

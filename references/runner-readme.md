@@ -49,7 +49,7 @@ workflow script (.js, unchanged)
 | `budget.spent()`              | summed per-turn **estimates** (~4 chars/token over prompt + final text; the CLI reports no usage) |
 | `parallel` / `pipeline`       | unchanged — pure JS scheduling                              |
 
-### The wire contract (`kimi -p`, verified on kimi 0.23.3)
+### The wire contract (`kimi -p`, verified on kimi 0.23.3, compatible through 0.27.0)
 
 Every agent turn spawns exactly:
 
@@ -125,17 +125,18 @@ text away from agents whose output you'll act on (see `authoring.md` →
 ### Model selection
 
 - **Usable ids are the CONFIGURED set** from `kimi provider list --json`
-  (config.toml) — on a stock kimi-code install: `kimi-code/kimi-for-coding` and
+  (config.toml) — on a stock kimi-code install: `kimi-code/k3` (the max-only
+  frontier tier, 1M ctx), `kimi-code/kimi-for-coding`, and
   `kimi-code/kimi-for-coding-highspeed`. The models.dev discovery catalog
   (`kimi provider catalog list`) is **not** usable: its ids fail with
   `config.invalid` unless configured.
-- **Aliases** — Claude ids / `opus` / `sonnet` → `kimi-for-coding`; `haiku` →
-  `kimi-for-coding-highspeed`; `kimi` / `frontier` → `kimi-for-coding`. A bare
-  name (`kimi-for-coding`) matches its provider-prefixed configured id.
+- **Aliases** — Claude ids / `opus` → `k3` (`kimi-code/k3`); `sonnet` / `haiku`
+  → `kimi-for-coding-highspeed`; `kimi` / `frontier` → `k3`. A bare name
+  (`k3`, `kimi-for-coding-highspeed`) matches its provider-prefixed configured id.
   `undefined` / `inherit` / `default` → no `--model` flag (kimi's own config
   default). An unconfigured id falls back to the config default with a warning.
 - **`--frontier`** pins every agent to the strongest configured model
-  (`pickFrontier` over the configured list; here `kimi-code/kimi-for-coding`),
+  (`pickFrontier` over the configured list; here `kimi-code/k3`),
   overriding any per-call `model`. **`--pin-model M`** does the same for an
   explicit M, validated against the configured set — an unusable pin exits 1
   up front (listing the configured ids) instead of letting every agent die
@@ -535,10 +536,10 @@ A persisted script written for Claude Code rarely needs editing to run here:
 
 - **Model translation** — a script (or `agentType`) that asks for
   `claude-opus-4-8`, or a bare `opus`/`sonnet`/`haiku` alias, maps onto the
-  models configured in kimi (`opus`/`sonnet` → `kimi-for-coding`, `haiku` →
+  models configured in kimi (`opus` → `kimi-code/k3`, `sonnet`/`haiku` →
   `kimi-for-coding-highspeed`, matched against `kimi provider list --json`).
   Unknown/`inherit` → kimi config default. `--frontier` bypasses this routing
-  and pins the whole run to the strongest configured model.
+  and pins the whole run to the strongest configured model (here `kimi-code/k3`).
 - **`agentType`** — `agent(p, { agentType: 'reviewer' })` loads
   `.claude/agents/reviewer.md` (project scope first, then `~/.claude`) and uses its
   body as the system prompt and its frontmatter `model` as a fallback.
@@ -617,8 +618,9 @@ the verified wire contract.
 
 ## Pinning to a Kimi version
 
-Flag names and stream shapes here were verified against the installed `kimi`
-0.23.3 (`src/kimiVersion.js` → `VERIFIED_KIMI_VERSION`): `-p` with
+Flag names and stream shapes here were verified against `kimi` 0.23.3 and
+confirmed compatible through 0.27.0 (`src/kimiVersion.js` → `VERIFIED_KIMI_VERSION`
+is `0.27.0`, with `KNOWN_COMPATIBLE_VERSIONS` covering both): `-p` with
 `--output-format stream-json`, `--model` with configured ids, `-S` resume, the
 `session.resume_hint` meta line, and `kimi provider list --json` as the source
 of usable model ids. The preflight (`npm run doctor`, `--offline` to skip the

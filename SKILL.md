@@ -116,8 +116,8 @@ are unchanged; steps 2 and 4 are where rough intent gets compiled.
    the result of one minimal model-pinned live turn (pass `--offline` to skip
    that turn). If it fails, tell the user to run `kimi login` (the runner needs
    a logged-in `kimi` CLI on PATH). The frontier pick is the strongest
-   *configured* model — e.g. `kimi-code/kimi-for-coding` on a standard install —
-   and every agent in the run uses it (see *Model*).
+   *configured* model — e.g. `kimi-code/k3` (the max-only frontier tier) on a
+   standard install — and every agent in the run uses it (see *Model*).
 
 2. **Compile** the rough intent into a workflow (see *Compiling rough intent into a
    workflow*): classify the job → pick the scale → pick the archetype → pick the
@@ -565,17 +565,18 @@ JavaScript using only the injected globals (no imports / fs — agents do all I/
 Use a **single model — the strongest configured model — for every agent in the
 run.** Do not mix models, and do not downgrade "cheap" or "simple" stages to a
 smaller model. Usable models are the ones **configured in the local Kimi CLI**
-(`kimi provider list --json`; e.g. `kimi-code/kimi-for-coding` and
-`kimi-code/kimi-for-coding-highspeed` on a standard install). The public
-discovery catalog (`kimi provider catalog list`) is *not* the usable set —
-passing an unconfigured catalog id to `--model` fails with `config.invalid`.
+(`kimi provider list --json`; e.g. `kimi-code/k3` (the max-only frontier tier),
+`kimi-code/kimi-for-coding`, and `kimi-code/kimi-for-coding-highspeed` on a
+standard install). The public discovery catalog (`kimi provider catalog list`)
+is *not* the usable set — passing an unconfigured catalog id to `--model` fails
+with `config.invalid`.
 
 Enforce it with **`--frontier`** (always pass it): the runner picks the
-strongest configured model and pins **every** agent to it, **overriding any
-per-call `model`** a script sets. This is a hard guarantee — even if a script
-asks for `opus` or a Claude id, `--frontier` forces the frontier pick and logs
-the override. (To pin a specific model instead, use `--pin-model <configured
-id>`, e.g. `--pin-model kimi-code/kimi-for-coding` — it is validated against
+strongest configured model (here `kimi-code/k3`) and pins **every** agent to it,
+**overriding any per-call `model`** a script sets. This is a hard guarantee —
+even if a script asks for `opus` or a Claude id, `--frontier` forces the frontier
+pick and logs the override. (To pin a specific model instead, use `--pin-model
+<configured id>`, e.g. `--pin-model kimi-code/k3` — it is validated against
 the configured set and the run fails fast, listing the configured ids, if the
 model isn't usable.)
 
@@ -798,10 +799,10 @@ Unknown flags are rejected with an error (exit 1) — the runner never guesses.
   auto-approves every tool action; see *Run defaults → Sandbox & permissions*).
   Don't write a script that tries to read files itself — have an `agent()` do it.
 - **Model mapping** — a script that requests `claude-opus-4-8` or a bare
-  `opus`/`sonnet`/`haiku` maps to a **configured** Kimi model: opus/sonnet →
-  `kimi-code/kimi-for-coding`, haiku → `kimi-code/kimi-for-coding-highspeed`
-  (first configured preference wins; bare configured names like
-  `kimi-for-coding` also resolve). Don't rely on that: pin every agent with
+  `opus`/`sonnet`/`haiku` maps to a **configured** Kimi model: opus →
+  `kimi-code/k3`, sonnet/haiku → `kimi-code/kimi-for-coding-highspeed`
+  (first configured preference wins; bare configured names like `k3` /
+  `kimi-for-coding-highspeed` also resolve). Don't rely on that: pin every agent with
   `--frontier` (or `--pin-model <configured id>`) — see
   *Model*. (`--model` is only the *fallback* default; a per-call `model` in the
   script overrides it, so it does NOT guarantee one model for every agent.)

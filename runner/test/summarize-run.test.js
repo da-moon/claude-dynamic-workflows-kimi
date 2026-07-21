@@ -113,6 +113,42 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
   ok("old metric-less journal: lower-bound warnings, journal-only");
 }
 
+// 3b) k3 SUPPRESSES the implicit-effort ("default-effort-cost") advice. k3 is the
+//     max-only frontier tier — its reasoning effort is automatic and there is no
+//     --effort/--auto-effort knob — so the "set an explicit effort" advice is moot
+//     once the run resolved to k3. Two independent triggers suppress it; a run that
+//     is NOT fully k3 must still warn (guards the runIsK3 gate, incl. its .every()).
+{
+  // (i) meta.model pins k3 → suppressed even though the effort-less agents recorded
+  //     a NON-k3 model id (isolates the `isK3(meta?.model)` branch of the gate).
+  const jPinned = [
+    { key: "a#0", label: "scan:a", phase: "Scan", model: "kimi-code/kimi-for-coding", tokens: 100_000, ms: 1000, result: { ok: 1 } },
+    { key: "b#0", label: "scan:b", phase: "Scan", model: "kimi-code/kimi-for-coding", tokens: 100_000, ms: 1000, result: { ok: 1 } },
+  ];
+  const sPinned = summarizeRun({ journalPath: writeRun("k3-pinned", { journal: jPinned, meta: { model: "kimi-code/k3", autoEffort: false } }).jpath });
+  assert.equal(codes(sPinned).includes("default-effort-cost"), false, "meta.model=k3 → implicit-effort advice suppressed (k3 is max-only)");
+
+  // (ii) no k3 meta, but EVERY effort-less agent already ran on k3 → suppressed
+  //      (isolates the `effortlessAgents.every(isK3)` branch of the gate).
+  const jAllK3 = Array.from({ length: 4 }, (_, i) => ({
+    key: "a" + i + "#0", label: "scan:" + i, phase: "Scan", model: "kimi-code/k3", tokens: 100_000, ms: 1000, result: { ok: 1 },
+  }));
+  const sAllK3 = summarizeRun({ journalPath: writeRun("k3-agents", { journal: jAllK3 }).jpath });
+  assert.equal(codes(sAllK3).includes("default-effort-cost"), false, "all effort-less agents on k3 → advice suppressed with no meta model");
+
+  // (iii) a MIXED run (one k3 agent, the rest non-k3, all effort-less) STILL warns —
+  //       the gate uses .every(), not .some(): a single non-k3 agent keeps the advice.
+  const jMixed = [
+    { key: "a#0", label: "scan:a", phase: "Scan", model: "kimi-code/k3", tokens: 100_000, ms: 1000, result: { ok: 1 } },
+    { key: "b#0", label: "scan:b", phase: "Scan", model: "kimi-code/kimi-for-coding", tokens: 100_000, ms: 1000, result: { ok: 1 } },
+    { key: "c#0", label: "scan:c", phase: "Scan", model: "kimi-code/kimi-for-coding", tokens: 100_000, ms: 1000, result: { ok: 1 } },
+    { key: "d#0", label: "scan:d", phase: "Scan", model: "kimi-code/kimi-for-coding", tokens: 100_000, ms: 1000, result: { ok: 1 } },
+  ];
+  const sMixed = summarizeRun({ journalPath: writeRun("mixed-nonk3", { journal: jMixed }).jpath });
+  assert.equal(codes(sMixed, "warn").includes("default-effort-cost"), true, "a mixed/non-k3 run with implicit effort still WARNS");
+  ok("k3 suppresses implicit-effort advice (pinned meta or all-k3 agents); a non-k3 run still warns");
+}
+
 // 4) Resumed run: event sidecar with cached replays + an interrupted agent.
 {
   const journal = [
