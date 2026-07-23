@@ -55,9 +55,8 @@ and stayed ahead through the third (794 vs 944). Both arms produced correct,
 file-citing answers (spot-checked: both located retry/backoff in
 `kimiAgent.js`'s `withRetry`/`isRetryable`).
 
-**Read this measurement's token column with real skepticism** — it is not
-comparable in scale to the pre-port GPT-5.5 numbers below, and the reason is
-mechanical, not a property of Kimi being cheaper:
+**Read this measurement's token column with real skepticism** — the absolute
+scale is a measurement artifact, not a property of Kimi being cheaper:
 
 - The headless `kimi -p` CLI reports **no real per-turn token usage**. The
   runner estimates tokens as ~4 chars/token of the **literal prompt string
@@ -68,48 +67,14 @@ mechanical, not a property of Kimi being cheaper:
   that corpus-reading cost happens inside the Kimi process and is invisible
   to the runner's meter.
 - That is why every number above is in the hundreds, not the hundreds of
-  thousands the GPT-5.5 run reported: the GPT-5.5 arm's tokens included the
-  full corpus text (the one-shot DSL there re-sent the transcript each
-  call); here, Kimi manages its own file reads out of band, so the estimate
-  only ever sees the short instruction/question and the short answer.
+  thousands you would see if the corpus text itself were counted: Kimi manages
+  its own file reads out of band, so the estimate only ever sees the short
+  instruction/question and the short answer.
 - The **wall-clock gap still holds up as real evidence** (cold re-reads the
   corpus from scratch every time and is measurably slower per question:
   ~20.7s vs ~11.3s), because wall time isn't estimated — it's the actual
   process duration. Treat the token column here as a lower-bound proxy for
   "prompt+reply size," not as a dollar-cost measurement of the Kimi run.
-
-### Historical measurement — pre-port, different backend (2026-06-09 · codex 0.137.0 · gpt-5.5 · effort medium · corpus `runner/src`, ~3.3k lines · 3 questions)
-
-> Taken on the original Codex backend **before the Kimi port**, where the
-> one-shot DSL re-sent the full transcript on every call, so tokens included
-> the actual corpus text. Not directly comparable to the Kimi measurement
-> above (different backend, different token-accounting model) — kept for
-> context on the original claim this benchmark was written to test.
-
-| | tokens | wall time |
-| :--- | ---: | ---: |
-| **Warm** — ingest (one-time, turn 0) | 329k | 80s |
-| **Warm** — each question (steer, marginal) | **~69k** | **~6s** |
-| **Cold** — each question (full re-read) | **~219k** | **~97s** |
-| **Warm** — arm total (1 ingest + 3 steers) | 535k | 99s |
-| **Cold** — arm total (3 agents) | 656k | 290s agent-time |
-
-Per question, after the one-time ingest, the warm worker was **~3× cheaper in
-tokens and ~16× faster** — it answers from context instead of re-reading. On
-totals the warm arm broke even at the **second** question and was ahead by the
-third (535k vs 656k). Both arms produced correct, file-citing answers
-(spot-checked: both located retry/backoff in `codexAgent.js`).
-
-Two honest notes:
-
-- **One question → use a one-shot.** The ingest dominates at N=1 (~398k warm — the
-  329k read plus one ~69k answer — vs a single cold question that re-reads and
-  answers in one shot, here 179k–289k depending on the question). Sessions win when
-  you'll ask *again* — which is the point.
-- The steers' ~69k/turn is mostly the thread's **re-billed (largely cached)
-  input**; raw token counts therefore *understate* the warm advantage in dollar
-  terms, since cached input is billed far below fresh input. The wall-clock gap
-  (6s vs 97s) needs no such caveat.
 
 Numbers vary with corpus size, model, and effort — the relative shape (flat
 cheap steers vs linear re-reads) is the durable result. Re-run with your own

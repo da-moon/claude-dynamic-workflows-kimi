@@ -19,29 +19,29 @@ export const meta = {
 // ── the artifact under review ───────────────────────────────────────────────
 const CURRENT_COMPLETED = `
 ╭─ ◆ market-news ────────────────────────────────────────────────────────╮
-│ 6 agents · 2 phases · 701k tok · 20m27s · gpt-5.5                      │
+│ 6 agents · 2 phases · 701k tok · 20m27s · kimi-code/k3                 │
 │ Fed, jobs and AI earnings kept stocks near records, but June 3 closing │
 │ levels were not yet final at midday.                                   │
 ╰────────────────────────────────────────────────────────────────────────╯
   │
   ▼ ① Gather ───────────────────────────────────  5 agents · 622k tok · 17m38s
-  ├─✓ indices    5.5  high     52k tok  1m26s
+  ├─✓ indices    k3   high     52k tok  1m26s
   │   S&P 500 rose 0.4% to a record 6,012; Nasdaq +0.6% and Dow +0.3% at the
   │   June 2 close.
-  ├─✓ movers     5.5  high    140k tok  5m16s
+  ├─✓ movers     k3   high    140k tok  5m16s
   │   Nvidia gained ~3% on AI demand; a major retailer slid 8% after cutting
   │   guidance.
-  ├─✓ sectors    5.5  high    166k tok  3m27s
+  ├─✓ sectors    k3   high    166k tok  3m27s
   │   Technology and communication services led; energy and utilities lagged.
-  ├─✓ macro      5.5  high    136k tok  4m02s
+  ├─✓ macro      k3   high    136k tok  4m02s
   │   The 10-year yield eased toward 4.2% as cooler jobs data kept a July cut
   │   in play.
-  ╰─✓ catalysts  5.5  high    128k tok  3m27s
+  ╰─✓ catalysts  k3   high    128k tok  3m27s
       Several megacap earnings beat after the bell; Fed speakers stayed
       data-dependent.
   ┄┄┄┄┄┄┄┄┄┄ barrier ┄┄┄┄┄┄┄┄┄┄┄
   ▼ ② Synthesize ──────────────────────────────────  1 agent · 79k tok · 2m49s
-  ╰─✓ brief      5.5  max      79k tok  2m49s
+  ╰─✓ brief      k3   max      79k tok  2m49s
       Fed, jobs and AI earnings kept stocks near records into June 3.
   │
   ▼
@@ -53,18 +53,18 @@ const CURRENT_COMPLETED = `
 
 const CURRENT_MIDRUN = `
 ╭─ ◆ market-news ────────────────────────────────────────────────────────╮
-│ 2 done · 3 running · 1 phase · 218k tok · 4m53s · gpt-5.5              │
+│ 2 done · 3 running · 1 phase · 218k tok · 4m53s · kimi-code/k3         │
 ╰────────────────────────────────────────────────────────────────────────╯
   │
   ▼ ① Gather ──────────────────────────  2 done · 3 running · 218k tok · 4m53s
-  ├─✓ indices    5.5  high     52k tok  1m26s
+  ├─✓ indices    k3   high     52k tok  1m26s
   │   S&P 500 rose 0.4% to a record 6,012; Nasdaq +0.6% and Dow +0.3% at the
   │   June 2 close.
-  ├─✓ sectors    5.5  high    166k tok  3m27s
+  ├─✓ sectors    k3   high    166k tok  3m27s
   │   Technology and communication services led; energy and utilities lagged.
-  ├─⠋ movers     5.5  high   6m00s running…
-  ├─⠋ macro      5.5  high   6m00s running…
-  ╰─⠋ catalysts  5.5  high   6m00s running…
+  ├─⠋ movers     k3   high   6m00s running…
+  ├─⠋ macro      k3   high   6m00s running…
+  ╰─⠋ catalysts  k3   high   6m00s running…
   │
   ▼
 ╭─ ✦ result ─────────────────────────────────────────────────────────────╮

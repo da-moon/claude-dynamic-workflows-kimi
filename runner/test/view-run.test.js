@@ -81,19 +81,19 @@ const cases = [
   // Same display label, distinct journal keys: the viewer keys agents by id, so all
   // three must index/render separately (a label-keyed index would collapse them).
   { name: "dup-labels", lines: [
-    J({ key: "d1#0", label: "worker", result: { n: 1 }, phase: "Work", model: "gpt-5.5", effort: "high", tokens: 10000, ms: 100 }),
-    J({ key: "d2#0", label: "worker", result: { n: 2 }, phase: "Work", model: "gpt-5.5", effort: "high", tokens: 20000, ms: 200 }),
-    J({ key: "d3#0", label: "worker", result: { n: 3 }, phase: "Work", model: "gpt-5.5", effort: "high", tokens: 30000, ms: 300 }) ] },
+    J({ key: "d1#0", label: "worker", result: { n: 1 }, phase: "Work", model: "kimi-code/k3", effort: "high", tokens: 10000, ms: 100 }),
+    J({ key: "d2#0", label: "worker", result: { n: 2 }, phase: "Work", model: "kimi-code/k3", effort: "high", tokens: 20000, ms: 200 }),
+    J({ key: "d3#0", label: "worker", result: { n: 3 }, phase: "Work", model: "kimi-code/k3", effort: "high", tokens: 30000, ms: 300 }) ] },
   { name: "empty", lines: [] },
   // Live run: 1 completed agent in the journal + 2 still running in the event
   // sidecar — the viewer should merge the running agents (status:'running').
   { name: "live",
-    lines: [J({ key: "g1#0", label: "gather:indices", result: { summary: "S&P 500 +0.4% to a record close." }, phase: "Gather", model: "gpt-5.5", effort: "high", tokens: 52000, ms: 86000 })],
+    lines: [J({ key: "g1#0", label: "gather:indices", result: { summary: "S&P 500 +0.4% to a record close." }, phase: "Gather", model: "kimi-code/k3", effort: "high", tokens: 52000, ms: 86000 })],
     events: [
-      J({ t: 1000, type: "start", label: "gather:indices", phase: "Gather", model: "gpt-5.5", effort: "high" }),
+      J({ t: 1000, type: "start", label: "gather:indices", phase: "Gather", model: "kimi-code/k3", effort: "high" }),
       J({ t: 87000, type: "end", label: "gather:indices", phase: "Gather" }),
-      J({ t: 1000, type: "start", label: "gather:movers", phase: "Gather", model: "gpt-5.5", effort: "high" }),
-      J({ t: 1000, type: "start", label: "gather:macro", phase: "Gather", model: "gpt-5.5", effort: "high" }),
+      J({ t: 1000, type: "start", label: "gather:movers", phase: "Gather", model: "kimi-code/k3", effort: "high" }),
+      J({ t: 1000, type: "start", label: "gather:macro", phase: "Gather", model: "kimi-code/k3", effort: "high" }),
     ],
     // a running agent mid-stream — the drawer should render its partial output
     progress: { "gather:macro": "Pulling the latest macro print and comparing to consensus…" } },
@@ -101,11 +101,11 @@ const cases = [
   // — the viewer should read them straight from the journal, no script needed.
   { name: "enriched", lines: [
     J({ key: "e1#0", label: "scan:auth", result: { findings: [{ title: "missing check", severity: "high" }] },
-      phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 412000, tokensOut: 90000, ms: 5300 }),
+      phase: "Scan", model: "kimi-code/k3", effort: "high", tokens: 412000, tokensOut: 90000, ms: 5300 }),
     J({ key: "e2#0", label: "scan:routes", result: { findings: [] },
-      phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 308000, tokensOut: 61000, ms: 4100 }),
+      phase: "Scan", model: "kimi-code/k3", effort: "high", tokens: 308000, tokensOut: 61000, ms: 4100 }),
     J({ key: "e3#0", label: "consolidate", result: { summary: "one real issue" },
-      phase: "Report", model: "gpt-5.5", effort: "max", tokens: 980000, tokensOut: 210000, ms: 21000 }) ] },
+      phase: "Report", model: "kimi-code/k3", effort: "max", tokens: 980000, tokensOut: 210000, ms: 21000 }) ] },
   // Persisted workflow result (the *.result.json sidecar): the viewer should show
   // the honest return value (result node → result drawer, Run overview inline).
   { name: "with-result",
@@ -121,12 +121,12 @@ const cases = [
   // timeline in the drawer, cancelled race losers rendered distinctly, and a
   // still-running steer (events) folded into its worker with streaming progress.
   { name: "sessionful", lines: [
-    J({ key: "sess:s1#0", label: "oracle", result: { summary: "Repo ingested." }, phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 52000, ms: 86000, session: true, sessionId: "s1", turn: 0, status: "completed", threadId: "th-1" }),
-    J({ key: "sess:s1#1", label: "oracle", result: { summary: "Auth flows traced." }, phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 30000, ms: 40000, session: true, sessionId: "s1", turn: 1, status: "completed", threadId: "th-1" }),
-    J({ key: "sess:s2#0", label: "rival", result: null, phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 12000, ms: 20000, session: true, sessionId: "s2", turn: 0, status: "cancelled", threadId: "th-2" }),
-    J({ key: "j#0", label: "judge:final", result: { one_line_verdict: "Oracle wins." }, phase: "Judge", model: "gpt-5.5", effort: "max", tokens: 90000, ms: 60000 }) ],
+    J({ key: "sess:s1#0", label: "oracle", result: { summary: "Repo ingested." }, phase: "Explore", model: "kimi-code/k3", effort: "high", tokens: 52000, ms: 86000, session: true, sessionId: "s1", turn: 0, status: "completed", threadId: "th-1" }),
+    J({ key: "sess:s1#1", label: "oracle", result: { summary: "Auth flows traced." }, phase: "Explore", model: "kimi-code/k3", effort: "high", tokens: 30000, ms: 40000, session: true, sessionId: "s1", turn: 1, status: "completed", threadId: "th-1" }),
+    J({ key: "sess:s2#0", label: "rival", result: null, phase: "Explore", model: "kimi-code/k3", effort: "high", tokens: 12000, ms: 20000, session: true, sessionId: "s2", turn: 0, status: "cancelled", threadId: "th-2" }),
+    J({ key: "j#0", label: "judge:final", result: { one_line_verdict: "Oracle wins." }, phase: "Judge", model: "kimi-code/k3", effort: "max", tokens: 90000, ms: 60000 }) ],
     events: [
-      J({ t: 1000, type: "start", id: "sess:s1#2", label: "oracle", phase: "Explore", model: "gpt-5.5", effort: "high", kind: "session", sessionId: "s1", turn: 2 }),
+      J({ t: 1000, type: "start", id: "sess:s1#2", label: "oracle", phase: "Explore", model: "kimi-code/k3", effort: "high", kind: "session", sessionId: "s1", turn: 2 }),
     ],
     progress: { "sess:s1#2": "Now writing the exact fix…" } },
   { name: "scripted-pipeline", lines: ["x.ts", "y.ts"].flatMap((f) => [
@@ -135,8 +135,8 @@ const cases = [
     script:
       "export const meta={name:'mini-review',description:'scan then verify',phases:[{title:'Scan'},{title:'Verify'}]}\n" +
       "phase('Scan')\n" +
-      "const r=await pipeline(args.files,(f)=>agent('scan '+f,{label:`scan:${f}`,phase:'Scan',model:'gpt-5.5',effort:'high'}),\n" +
-      "  (res,f)=>agent('verify '+f,{label:`verify:${f}`,phase:'Verify',model:'gpt-5.4',effort:'low'}))\nreturn r" },
+      "const r=await pipeline(args.files,(f)=>agent('scan '+f,{label:`scan:${f}`,phase:'Scan',model:'kimi-code/k3',effort:'high'}),\n" +
+      "  (res,f)=>agent('verify '+f,{label:`verify:${f}`,phase:'Verify',model:'kimi-code/kimi-for-coding',effort:'low'}))\nreturn r" },
 ];
 
 let failed = 0;

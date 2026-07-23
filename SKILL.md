@@ -206,8 +206,8 @@ each bets on, per-run budgets) before launching. Two axes, freely mixed:
 
 Split the user's overall budget across variants (status shows each run's
 spend against its ceiling). **Size read-heavy fan-outs realistically using the
-measurements below (taken on the original GPT-5.5 backend — order-of-magnitude
-guidance on Kimi):** an
+measurements below (order-of-magnitude guidance only — they were measured
+pre-port):** an
 agent whose job is *reading a repo/corpus* costs **~400–600k tokens
 regardless of its effort tier** — the input dominates, so `--effort low`
 does not make a sweep cheap, and `--plan`'s per-effort estimate undercounts
@@ -769,8 +769,8 @@ Unknown flags are rejected with an error (exit 1) — the runner never guesses.
   advisory: size it for the **whole fan-out**, not one agent. Run **`--plan`**
   first — a no-token dry run that counts agents per phase/effort and prints an
   estimated `--budget` (a lower bound for fan-outs sized from agent output).
-  Based on measurements taken on the original GPT-5.5 backend (treat them as
-  order-of-magnitude guidance on Kimi), a medium-effort frontier run spent
+  Based on pre-port measurements (treat them as order-of-magnitude guidance on
+  Kimi), a medium-effort frontier run spent
   **~0.3–0.5M tokens/agent** (reasoning included), so an N-agent run wants
   `--budget ≈ N × 500k` with
   headroom. (A 35-agent run blew past an 8M ceiling after only ~17 agents.)

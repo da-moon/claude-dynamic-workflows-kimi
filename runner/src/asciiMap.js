@@ -285,7 +285,7 @@ function agentRow(a, conn, labelW, C, hasMetrics, now, spinner) {
   const running = a.status === "running";
   const glyph = running ? C.cyan(spinner || "⠿") : a.result == null ? C.yellow("◑") : C.green("✓");
   const cells = [C.text(padEndW(displayLabel(a.label), labelW))];
-  cells.push(C.dim(padEndW(a.model || "", GRID.model)));
+  cells.push(C.dim(padEndW((a.model || "").replace(/^.*\//, ""), GRID.model)));
   cells.push(a.effort ? C.effort(a.effort, padEndW(a.effort, GRID.effort)) : C.dim(padEndW("", GRID.effort)));
   if (running) {
     cells.push(C.dim(padStartW("--", GRID.tok)));
@@ -304,7 +304,7 @@ function workerRow(run, s, conn, labelW, C, hasMetrics, now, spinner) {
   const running = s.status === "running";
   const glyph = sessionGlyph(s.status, C, spinner);
   const cells = [C.text(padEndW(displayLabel(s.label), labelW))];
-  cells.push(C.dim(padEndW(s.model || "", GRID.model)));
+  cells.push(C.dim(padEndW((s.model || "").replace(/^.*\//, ""), GRID.model)));
   cells.push(s.effort ? C.effort(s.effort, padEndW(s.effort, GRID.effort)) : C.dim(padEndW("", GRID.effort)));
   if (running) {
     cells.push(C.dim(padStartW(s.tokens ? fmtTokens(s.tokens) : "--", GRID.tok)));

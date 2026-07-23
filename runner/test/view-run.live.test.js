@@ -86,12 +86,12 @@ function extract(htmlPath) {
 
 // A run with one finished + two running agents (running come from the event sidecar).
 const J = (o) => JSON.stringify(o);
-const lines = [J({ key: "g1#0", label: "gather:a", result: { summary: "done" }, phase: "Gather", model: "gpt-5.5", effort: "high", tokens: 52000, ms: 86000 })];
+const lines = [J({ key: "g1#0", label: "gather:a", result: { summary: "done" }, phase: "Gather", model: "kimi-code/k3", effort: "high", tokens: 52000, ms: 86000 })];
 const events = [
-  J({ t: 1000, type: "start", label: "gather:a", phase: "Gather", model: "gpt-5.5", effort: "high" }),
+  J({ t: 1000, type: "start", label: "gather:a", phase: "Gather", model: "kimi-code/k3", effort: "high" }),
   J({ t: 87000, type: "end", label: "gather:a", phase: "Gather" }),
-  J({ t: 1000, type: "start", label: "gather:b", phase: "Gather", model: "gpt-5.5", effort: "high" }),
-  J({ t: 1000, type: "start", label: "gather:c", phase: "Gather", model: "gpt-5.5", effort: "high" }),
+  J({ t: 1000, type: "start", label: "gather:b", phase: "Gather", model: "kimi-code/k3", effort: "high" }),
+  J({ t: 1000, type: "start", label: "gather:c", phase: "Gather", model: "kimi-code/k3", effort: "high" }),
 ];
 
 const dir = join(ROOT, "live"), jdir = join(dir, ".workflow-journal");

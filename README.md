@@ -116,20 +116,20 @@ Behind that one line, Kimi:
 
 ```text
 ╭─ ◆ market-news ──────────────────────────────────────────────────────────────╮
-│ ✓✓✓✓✓✓  6/6 done · 2 phases · 701k tok · 20m27s · gpt-5.5                    │
+│ ✓✓✓✓✓✓  6/6 done · 2 phases · 701k tok · 20m27s · kimi-code/k3               │
 ╰──────────────────────────────────────────────────────────────────────────────╯
   │
   ▼ ① Gather ───────────────────────────────────  5 agents · 622k tok · 17m38s
       AGENT      MODEL    EFFORT  TOKENS    WALL
-  ├─✓ indices    gpt-5.5  high       52k   1m26s
+  ├─✓ indices    k3       high       52k   1m26s
   │   S&P 500 rose 0.4% to a record 6,012; Nasdaq +0.6% and Dow +0.3% close.
-  ├─✓ movers     gpt-5.5  high      140k   5m16s
+  ├─✓ movers     k3       high      140k   5m16s
   │   Nvidia gained ~3% on AI demand; a major retailer slid 8% on guidance.
-  ╰─✓ catalysts  gpt-5.5  high      128k   3m27s
+  ╰─✓ catalysts  k3       high      128k   3m27s
       Several megacap earnings beat after the bell; Fed stayed data-dependent.
   ┄ barrier · Gather → Synthesize ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   ▼ ② Synthesize ──────────────────────────────────  1 agent · 79k tok · 2m49s
-  ╰─✓ brief      gpt-5.5  max        79k   2m49s
+  ╰─✓ brief      k3       max        79k   2m49s
       Fed, jobs and AI earnings kept stocks near records into June 3.
   │
   ▼
@@ -138,9 +138,9 @@ Behind that one line, Kimi:
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
-The captured output above is preserved from a run on the original GPT-5.5
-backend (model chips as recorded). On Kimi, the skill deliberately does not
-route stages across model tiers: `--frontier` picks the strongest model
+The captured output above is a sample run (model chips as recorded). The skill
+deliberately does not route stages across model tiers: `--frontier` picks the
+strongest model
 **configured in your kimi CLI** (`kimi provider list` — e.g.
 `kimi-code/k3`, the max-only frontier tier) and pins the whole run to that one model.
 
@@ -234,7 +234,7 @@ The classic **find → adversarially-verify** shape, and the reason to use a fle
 
 > `/kimi-workflows  Read everything under packages/core into one worker, then I'm going to ask it a stream of questions — keep it warm.`
 
-This is the **sessionful** superpower the native one-shot DSL can't do. One worker ingests the corpus **once** (`agent.start`); every follow-up is a `session.steer` on the *same warm thread* — it answers from context instead of re-reading. Measured on this repo's own source (kimi-code 0.23.3): after the one-time load, each follow-up ran **~1.6× cheaper in (estimated) tokens and ~1.8× faster per turn** than a cold re-read, with the warm arm's cumulative tokens ahead by the second question ([benchmark + measurement caveats](examples/benchmarks)). (An earlier pre-port GPT-5.5 run measured ~3×/~16×, but its token accounting is not comparable.) Works for a data room, a contract set, a spec bundle, a log archive — anything you'll question more than twice.
+This is the **sessionful** superpower the native one-shot DSL can't do. One worker ingests the corpus **once** (`agent.start`); every follow-up is a `session.steer` on the *same warm thread* — it answers from context instead of re-reading. Measured on this repo's own source (kimi-code 0.23.3): after the one-time load, each follow-up ran **~1.6× cheaper in (estimated) tokens and ~1.8× faster per turn** than a cold re-read, with the warm arm's cumulative tokens ahead by the second question ([benchmark + measurement caveats](examples/benchmarks)). Works for a data room, a contract set, a spec bundle, a log archive — anything you'll question more than twice.
 
 ### 4 · Throw several strategies at one stubborn bug
 
@@ -456,7 +456,7 @@ for (const s of first.pendingSessions) await s.cancel();           // stop the l
 - **Race and cut losers** — fire several strategies at one problem, keep the first that works, cancel the rest.
 - **Follow the evidence** — a controller agent chases the strongest lead instead of a question list frozen at author time.
 
-**Measured, not asserted** ([`examples/benchmarks/`](examples/benchmarks)): on the current Kimi backend (kimi-code 0.23.3, at the then-current `medium` effort), a warm worker answered each follow-up **~1.6× cheaper in (estimated) tokens and ~1.8× faster per turn** than cold one-shots, cumulative tokens ahead by the second question. (The pre-port GPT-5.5 run measured ~3×/~16×, but its token accounting is not comparable — see the benchmark README's caveats.)
+**Measured, not asserted** ([`examples/benchmarks/`](examples/benchmarks)): on the current Kimi backend (kimi-code 0.23.3, at the then-current `medium` effort), a warm worker answered each follow-up **~1.6× cheaper in (estimated) tokens and ~1.8× faster per turn** than cold one-shots, cumulative tokens ahead by the second question.
 
 **Runnable examples** (all `--plan`-safe — dry-run any with `--plan`, no Kimi, no tokens):
 `sessionful-workers` (the intro) · `warm-context-interrogation` (load once, ask many) · `hedged-take-first-win` (race + cancel) · `flaky-bug-perturbation` (hold a repro, perturb it) · `lead-following-research` (controller chases leads) · `stateful-dialogue` (memory vs. a cold judge) · `agent-foreman` (supervised autonomy, escalate at forks) · `human-gate` (pause at a declared fork, answer in the live viewer, steer the warm worker).
@@ -496,7 +496,7 @@ Key flags: `--frontier` (pin the strongest configured model), `--auto-effort` (s
 
 ### The run summary report
 
-`run-workflow` prints a one-line recap when a run finishes (`--summary` for the full report; `--no-summary` to silence it). To distill any past run yourself — what it cost, where the time went, and whether anything looks off — point `summarize-run` at the journal. The bundled report below is preserved output from the GPT-5.5 incident demo:
+`run-workflow` prints a one-line recap when a run finishes (`--summary` for the full report; `--no-summary` to silence it). To distill any past run yourself — what it cost, where the time went, and whether anything looks off — point `summarize-run` at the journal. The bundled report below is preserved output from the incident demo:
 
 ```text
 $ node runner/bin/summarize-run.js examples/incident-demo
@@ -523,9 +523,9 @@ $ node runner/bin/summarize-run.js examples/incident-demo
   hunt:cache        Hunt               1      14k      22s  cancelled
 
 ── Costliest agents (by tokens) ───────────────────────────────────────────
-    1.    208k  fix:patch                    Fix            gpt-5.5
-    2.    141k  hunt:n+1 · t0                Hunt           gpt-5.5
-    3.    134k  triage:logs                  Triage         gpt-5.5
+    1.    208k  fix:patch                    Fix            kimi-code/k3
+    2.    141k  hunt:n+1 · t0                Hunt           kimi-code/k3
+    3.    134k  triage:logs                  Triage         kimi-code/k3
     …                                       (up to the top 10; slowest-by-time too)
 ```
 

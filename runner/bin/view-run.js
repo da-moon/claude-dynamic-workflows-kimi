@@ -695,7 +695,7 @@ function sessionTreeMeta(s){
   if(ra){ m.append(h('span',{class:'run'}, ra.startedAt?h('span',{'data-elapsed-start':ra.startedAt},elapsedOf(ra)||'…'):'running')); }
   else if(s.ms) m.append(h('span',{},fmtMs(s.ms)));
   if(s.tokens) m.append(h('span',{},fmtTokens(s.tokens)));
-  if(s.model) m.append(h('span',{class:'chip',style:{color:modelColor[s.model],borderColor:modelColor[s.model]+'55',padding:'0 6px',fontSize:'10px'}},s.model.replace('gpt-','')));
+  if(s.model) m.append(h('span',{class:'chip',style:{color:modelColor[s.model],borderColor:modelColor[s.model]+'55',padding:'0 6px',fontSize:'10px'}},s.model.replace(/^.*\//,'')));
   return m;
 }
 // inline agent metrics: elapsed (running, ticks) or time, tokens, model
@@ -704,7 +704,7 @@ function agentTreeMeta(a){
   if(isRunning(a)){ m.append(h('span',{class:'run'}, a.startedAt?h('span',{'data-elapsed-start':a.startedAt},elapsedOf(a)||'…'):'running')); }
   else if(a.ms!=null){ m.append(h('span',{},fmtMs(a.ms))); }
   if(a.tokens!=null) m.append(h('span',{},fmtTokens(a.tokens)));
-  if(a.model) m.append(h('span',{class:'chip',style:{color:modelColor[a.model],borderColor:modelColor[a.model]+'55',padding:'0 6px',fontSize:'10px'}},a.model.replace('gpt-','')));
+  if(a.model) m.append(h('span',{class:'chip',style:{color:modelColor[a.model],borderColor:modelColor[a.model]+'55',padding:'0 6px',fontSize:'10px'}},a.model.replace(/^.*\//,'')));
   return m;
 }
 function node(target,twig,labelText,count,cls,isPhase,idx,running){
@@ -1170,7 +1170,7 @@ function agentNode(a){
     onclick:open, onkeydown:(e)=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();open();} }});
   n.append(h('span',{class:'msdot'+(run?' amber':'')}));
   n.append(h('span',{class:'mlabel'}, a.label.includes(':')?a.label.split(':').slice(1).join(':'):a.label));
-  if(a.model) n.append(h('span',{class:'chip mmodel',style:{color:modelColor[a.model],borderColor:modelColor[a.model]+'55'}},a.model.replace('gpt-','')));
+  if(a.model) n.append(h('span',{class:'chip mmodel',style:{color:modelColor[a.model],borderColor:modelColor[a.model]+'55'}},a.model.replace(/^.*\//,'')));
   // node footer: live elapsed (ticks) for running, else time + tokens
   const stats=h('div',{class:'mstats'}); let hasStat=false;
   if(run){ stats.append(h('span',{class:'st run'}, a.startedAt?h('span',{'data-elapsed-start':a.startedAt}, el||'…'):'running')); hasStat=true; }
@@ -1203,7 +1203,7 @@ function workerNode(s){
   n.append(h('span',{class:'msdot'+(running?' amber':'')}));
   n.append(h('span',{class:'mlabel'}, s.label.includes(':')?s.label.split(':').slice(1).join(':'):s.label));
   n.append(h('span',{class:'wbadge'},'worker ⟳ '+s.turns.length));
-  if(s.model) n.append(h('span',{class:'chip mmodel',style:{color:modelColor[s.model],borderColor:modelColor[s.model]+'55'}},s.model.replace('gpt-','')));
+  if(s.model) n.append(h('span',{class:'chip mmodel',style:{color:modelColor[s.model],borderColor:modelColor[s.model]+'55'}},s.model.replace(/^.*\//,'')));
   n.append(h('div',{class:'turnstrip'},s.turns.map(turnChip)));
   const stats=h('div',{class:'mstats'}); let hasStat=false;
   if(running){ stats.append(h('span',{class:'st run'}, ra&&ra.startedAt?h('span',{'data-elapsed-start':ra.startedAt}, elapsedOf(ra)||'…'):'running')); hasStat=true; }
@@ -1266,7 +1266,7 @@ function phaseRow(p,i){
     if(hidRunning) info.append(h('span',{class:'run'},hidRunning+' running'));
     if(hidTokens) info.append(h('span',{},fmtTokens(hidTokens)+' tok'));
     if(Object.keys(mods).length){ const chips=h('div',{class:'maggchips'});
-      Object.entries(mods).forEach(([mm,ct])=>chips.append(h('span',{class:'chip mmodel',style:{color:modelColor[mm],borderColor:modelColor[mm]+'55'}},mm.replace('gpt-','')+(ct>1?'×'+ct:''))));
+      Object.entries(mods).forEach(([mm,ct])=>chips.append(h('span',{class:'chip mmodel',style:{color:modelColor[mm],borderColor:modelColor[mm]+'55'}},mm.replace(/^.*\//,'')+(ct>1?'×'+ct:''))));
       info.append(chips); }
     agg.append(info);
     els.push(agg); nodes.append(agg);

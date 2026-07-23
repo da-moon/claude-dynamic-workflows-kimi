@@ -48,9 +48,9 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
 //    model/effort breakdown, run wall-clock — and no spurious warnings.
 {
   const journal = [
-    { key: "a#0", label: "scan:auth", phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 400_000, ms: 4000, result: { findings: [{ x: 1 }] } },
-    { key: "b#0", label: "scan:routes", phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 300_000, ms: 6000, result: { findings: [] } },
-    { key: "c#0", label: "report", phase: "Report", model: "gpt-5.5", effort: "max", tokens: 900_000, ms: 12_000, result: { headline: "one real issue" } },
+    { key: "a#0", label: "scan:auth", phase: "Scan", model: "kimi-code/k3", effort: "high", tokens: 400_000, ms: 4000, result: { findings: [{ x: 1 }] } },
+    { key: "b#0", label: "scan:routes", phase: "Scan", model: "kimi-code/k3", effort: "high", tokens: 300_000, ms: 6000, result: { findings: [] } },
+    { key: "c#0", label: "report", phase: "Report", model: "kimi-code/k3", effort: "max", tokens: 900_000, ms: 12_000, result: { headline: "one real issue" } },
   ];
   const events = [
     { t: 1000, type: "start", label: "scan:auth", phase: "Scan" },
@@ -76,7 +76,7 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
   assert.equal(scan.wallMs, 6000, "wall-clock = 7000 - 1000 (the two ran in parallel)");
   assert.equal(s.topByTokens[0].label, "report", "costliest is the synthesizer");
   assert.equal(s.topByMs[0].label, "report", "slowest is the synthesizer");
-  assert.deepEqual(s.byModel, [{ model: "gpt-5.5", agents: 3, tokens: 1_600_000 }]);
+  assert.deepEqual(s.byModel, [{ model: "kimi-code/k3", agents: 3, tokens: 1_600_000 }]);
   assert.deepEqual(codes(s, "warn"), [], "a clean enriched run has no warnings");
   // text + markdown render without throwing and carry the key facts
   const txt = renderSummaryText(s);
@@ -141,9 +141,9 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
 // 4) Resumed run: event sidecar with cached replays + an interrupted agent.
 {
   const journal = [
-    { key: "x#0", label: "find:a", phase: "Find", model: "gpt-5.5", effort: "high", tokens: 100_000, ms: 1000, result: { ok: 1 } },
-    { key: "y#0", label: "find:b", phase: "Find", model: "gpt-5.5", effort: "high", tokens: 100_000, ms: 1000, result: { ok: 1 } },
-    { key: "z#0", label: "verify:a", phase: "Verify", model: "gpt-5.5", effort: "high", tokens: 200_000, ms: 2000, result: { real: true } },
+    { key: "x#0", label: "find:a", phase: "Find", model: "kimi-code/k3", effort: "high", tokens: 100_000, ms: 1000, result: { ok: 1 } },
+    { key: "y#0", label: "find:b", phase: "Find", model: "kimi-code/k3", effort: "high", tokens: 100_000, ms: 1000, result: { ok: 1 } },
+    { key: "z#0", label: "verify:a", phase: "Verify", model: "kimi-code/k3", effort: "high", tokens: 200_000, ms: 2000, result: { real: true } },
   ];
   const events = [
     { t: 50, type: "cached", label: "find:a", phase: "Find" },
@@ -171,10 +171,10 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
 // 5) Budget meta sidecar near the ceiling → budget section + budget-pressure warn.
 {
   const journal = [
-    { key: "a#0", label: "scan:a", phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 450_000, ms: 5000, result: {} },
-    { key: "b#0", label: "scan:b", phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 450_000, ms: 5000, result: {} },
+    { key: "a#0", label: "scan:a", phase: "Scan", model: "kimi-code/k3", effort: "high", tokens: 450_000, ms: 5000, result: {} },
+    { key: "b#0", label: "scan:b", phase: "Scan", model: "kimi-code/k3", effort: "high", tokens: 450_000, ms: 5000, result: {} },
   ];
-  const meta = { startedAt: 1, budget: 1_000_000, budgetMeter: "total", model: "gpt-5.5", autoEffort: true, sandbox: "read-only" };
+  const meta = { startedAt: 1, budget: 1_000_000, budgetMeter: "total", model: "kimi-code/k3", autoEffort: true, sandbox: "read-only" };
   const { jpath } = writeRun("budgeted", { journal, meta });
   const s = summarizeRun({ journalPath: jpath });
   assert.ok(s.budget, "budget present when meta carries a ceiling");
@@ -187,7 +187,7 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
   assert.ok(codes(s, "warn").includes("budget-pressure"), "≥80% used -> warn");
   // A pre-enforcement meta (no sandboxEnforcement field) reports its sandbox
   // label as what it truly was: advisory.
-  assert.deepEqual(s.policy, { model: "gpt-5.5", autoEffort: true, pinEffort: null, sandbox: "read-only", sandboxEnforcement: "advisory" });
+  assert.deepEqual(s.policy, { model: "kimi-code/k3", autoEffort: true, pinEffort: null, sandbox: "read-only", sandboxEnforcement: "advisory" });
   const txt = renderSummaryText(s);
   assert.match(txt, /Budget\s+900k \/ 1\.0M total \(90% used · 100k left\)/);
   assert.match(txt, /Run policy/);
@@ -198,7 +198,7 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
 
 // 6) Null-heavy run → many-null-results warning (and completed excludes nulls).
 {
-  const mk = (i, nul) => ({ key: "n" + i + "#0", label: "task:" + i, phase: "Work", model: "gpt-5.5", effort: "high", tokens: 100_000, ms: 1000, result: nul ? null : { ok: 1 } });
+  const mk = (i, nul) => ({ key: "n" + i + "#0", label: "task:" + i, phase: "Work", model: "kimi-code/k3", effort: "high", tokens: 100_000, ms: 1000, result: nul ? null : { ok: 1 } });
   const journal = [mk(0, false), mk(1, false), mk(2, false), mk(3, true), mk(4, true)];
   const { jpath } = writeRun("nulls", { journal });
   const s = summarizeRun({ journalPath: jpath });
@@ -211,7 +211,7 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
 // 7) Single huge fan-out (≥12 agents, one phase) → structure warning.
 {
   const journal = Array.from({ length: 13 }, (_, i) => ({
-    key: "f" + i + "#0", label: "find:bug-" + i, phase: "Find", model: "gpt-5.5", effort: "high", tokens: 100_000, ms: 1000, result: { issue: i },
+    key: "f" + i + "#0", label: "find:bug-" + i, phase: "Find", model: "kimi-code/k3", effort: "high", tokens: 100_000, ms: 1000, result: { issue: i },
   }));
   const { jpath } = writeRun("fanout", { journal });
   const s = summarizeRun({ journalPath: jpath });
@@ -223,8 +223,8 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
 // 8) Unlabeled agents (a prompt-slice label) → an advisory note.
 {
   const journal = [
-    { key: "a#0", label: "Summarize the entire architecture in painstaking detail", phase: "Work", model: "gpt-5.5", effort: "high", tokens: 100_000, ms: 1000, result: "x" },
-    { key: "b#0", label: "report", phase: "Work", model: "gpt-5.5", effort: "high", tokens: 100_000, ms: 1000, result: "y" },
+    { key: "a#0", label: "Summarize the entire architecture in painstaking detail", phase: "Work", model: "kimi-code/k3", effort: "high", tokens: 100_000, ms: 1000, result: "x" },
+    { key: "b#0", label: "report", phase: "Work", model: "kimi-code/k3", effort: "high", tokens: 100_000, ms: 1000, result: "y" },
   ];
   const { jpath } = writeRun("unlabeled", { journal });
   const s = summarizeRun({ journalPath: jpath });
@@ -236,7 +236,7 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
 
 // 9) Result sidecar + --include-result: result attached and previewed; omitted otherwise.
 {
-  const journal = [{ key: "s#0", label: "synthesize", phase: "Synthesize", model: "gpt-5.5", effort: "max", tokens: 50_000, ms: 9000, result: { headline: "internal" } }];
+  const journal = [{ key: "s#0", label: "synthesize", phase: "Synthesize", model: "kimi-code/k3", effort: "max", tokens: 50_000, ms: 9000, result: { headline: "internal" } }];
   const result = { headline: "Ship the state-preserving viewer", quick_wins: ["atomic writes"] };
   const { jpath } = writeRun("withresult", { journal, result });
   const plain = summarizeRun({ journalPath: jpath });
@@ -251,8 +251,8 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
 // 10) renderEndOfRun: quiet (one line) for tiny runs; phase table for larger ones.
 {
   const tiny = summarizeRun({ journalPath: writeRun("tiny", { journal: [
-    { key: "a#0", label: "a", phase: "P", model: "gpt-5.5", effort: "high", tokens: 100_000, ms: 1000, result: 1 },
-    { key: "b#0", label: "b", phase: "P", model: "gpt-5.5", effort: "high", tokens: 100_000, ms: 1000, result: 2 },
+    { key: "a#0", label: "a", phase: "P", model: "kimi-code/k3", effort: "high", tokens: 100_000, ms: 1000, result: 1 },
+    { key: "b#0", label: "b", phase: "P", model: "kimi-code/k3", effort: "high", tokens: 100_000, ms: 1000, result: 2 },
   ] }).jpath });
   const tinyOut = renderEndOfRun(tiny, { reportCmd: "node summarize-run.js --journal x" });
   assert.equal(tinyOut.split("\n").filter((l) => /^\s{2}\S/.test(l) && !l.includes("full report")).length, 0, "no phase table for ≤2 agents");
@@ -260,9 +260,9 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
   assert.match(tinyOut, /full report:/);
 
   const big = summarizeRun({ journalPath: writeRun("big", { journal: [
-    { key: "a#0", label: "scan:a", phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 100_000, ms: 1000, result: 1 },
-    { key: "b#0", label: "scan:b", phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 100_000, ms: 1000, result: 2 },
-    { key: "c#0", label: "report", phase: "Report", model: "gpt-5.5", effort: "max", tokens: 300_000, ms: 4000, result: 3 },
+    { key: "a#0", label: "scan:a", phase: "Scan", model: "kimi-code/k3", effort: "high", tokens: 100_000, ms: 1000, result: 1 },
+    { key: "b#0", label: "scan:b", phase: "Scan", model: "kimi-code/k3", effort: "high", tokens: 100_000, ms: 1000, result: 2 },
+    { key: "c#0", label: "report", phase: "Report", model: "kimi-code/k3", effort: "max", tokens: 300_000, ms: 4000, result: 3 },
   ] }).jpath });
   const bigOut = renderEndOfRun(big);
   assert.match(bigOut, /Scan/);
@@ -272,7 +272,7 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
 
 // 11) The tool is read-only: it never mutates the journal or creates sidecars.
 {
-  const journal = [{ key: "a#0", label: "x", phase: "P", model: "gpt-5.5", effort: "high", tokens: 1000, ms: 100, result: 1 }];
+  const journal = [{ key: "a#0", label: "x", phase: "P", model: "kimi-code/k3", effort: "high", tokens: 1000, ms: 100, result: 1 }];
   const { dir, jpath } = writeRun("readonly", { journal });
   const jdir = join(dir, ".workflow-journal");
   const before = readFileSync(jpath, "utf8");
@@ -289,8 +289,8 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
 // 12) End-to-end CLI: text / json / markdown / --out, and locateRun via run-dir.
 {
   const { dir, jpath } = writeRun("e2e", { journal: [
-    { key: "a#0", label: "scan:a", phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 400_000, ms: 4000, result: { findings: [] } },
-    { key: "b#0", label: "report", phase: "Report", model: "gpt-5.5", effort: "max", tokens: 900_000, ms: 12_000, result: { headline: "done" } },
+    { key: "a#0", label: "scan:a", phase: "Scan", model: "kimi-code/k3", effort: "high", tokens: 400_000, ms: 4000, result: { findings: [] } },
+    { key: "b#0", label: "report", phase: "Report", model: "kimi-code/k3", effort: "max", tokens: 900_000, ms: 12_000, result: { headline: "done" } },
   ] });
   const text = execFileSync("node", [BIN, "--journal", jpath], { encoding: "utf8" });
   assert.match(text, /Run summary · e2e/);
@@ -308,9 +308,9 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
 //     executed tokens (matched by id), separate from the journal's all-in total.
 {
   const journal = [
-    { key: "x#0", label: "scan:a", phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 450_000, ms: 5000, result: {} },
-    { key: "y#0", label: "scan:b", phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 450_000, ms: 5000, result: {} },
-    { key: "z#0", label: "report", phase: "Report", model: "gpt-5.5", effort: "max", tokens: 300_000, ms: 4000, result: {} },
+    { key: "x#0", label: "scan:a", phase: "Scan", model: "kimi-code/k3", effort: "high", tokens: 450_000, ms: 5000, result: {} },
+    { key: "y#0", label: "scan:b", phase: "Scan", model: "kimi-code/k3", effort: "high", tokens: 450_000, ms: 5000, result: {} },
+    { key: "z#0", label: "report", phase: "Report", model: "kimi-code/k3", effort: "max", tokens: 300_000, ms: 4000, result: {} },
   ];
   // resume: the two scans replay from cache (0 tokens this run); only report executes.
   const events = [
@@ -319,7 +319,7 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
     { t: 100, type: "start", id: "z#0", label: "report", phase: "Report" },
     { t: 500, type: "end", id: "z#0", label: "report", phase: "Report", tokens: 300_000, ms: 4000 },
   ];
-  const meta = { budget: 1_000_000, budgetMeter: "total", model: "gpt-5.5", autoEffort: true, sandbox: "read-only" };
+  const meta = { budget: 1_000_000, budgetMeter: "total", model: "kimi-code/k3", autoEffort: true, sandbox: "read-only" };
   const { jpath } = writeRun("resumed-budget", { journal, events, meta });
   const s = summarizeRun({ journalPath: jpath });
   assert.equal(s.metrics.totalTokens, 1_200_000, "all-in across the journal");
@@ -338,11 +338,11 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
 // excluded from the null-result reliability signal, failed turns warned.
 {
   const journal = [
-    { key: "sess:s1#0", label: "oracle", phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 52_000, ms: 86_000, result: { summary: "loaded" }, session: true, sessionId: "s1", turn: 0, status: "completed" },
-    { key: "sess:s1#1", label: "oracle", phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 30_000, ms: 40_000, result: { summary: "traced" }, session: true, sessionId: "s1", turn: 1, status: "completed" },
-    { key: "sess:s2#0", label: "rival", phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 12_000, ms: 20_000, result: null, session: true, sessionId: "s2", turn: 0, status: "cancelled" },
-    { key: "sess:s3#0", label: "flaky", phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 8_000, ms: 9_000, result: null, session: true, sessionId: "s3", turn: 0, status: "failed" },
-    { key: "j#0", label: "judge:final", phase: "Judge", model: "gpt-5.5", effort: "max", tokens: 90_000, ms: 60_000, result: {} },
+    { key: "sess:s1#0", label: "oracle", phase: "Explore", model: "kimi-code/k3", effort: "high", tokens: 52_000, ms: 86_000, result: { summary: "loaded" }, session: true, sessionId: "s1", turn: 0, status: "completed" },
+    { key: "sess:s1#1", label: "oracle", phase: "Explore", model: "kimi-code/k3", effort: "high", tokens: 30_000, ms: 40_000, result: { summary: "traced" }, session: true, sessionId: "s1", turn: 1, status: "completed" },
+    { key: "sess:s2#0", label: "rival", phase: "Explore", model: "kimi-code/k3", effort: "high", tokens: 12_000, ms: 20_000, result: null, session: true, sessionId: "s2", turn: 0, status: "cancelled" },
+    { key: "sess:s3#0", label: "flaky", phase: "Explore", model: "kimi-code/k3", effort: "high", tokens: 8_000, ms: 9_000, result: null, session: true, sessionId: "s3", turn: 0, status: "failed" },
+    { key: "j#0", label: "judge:final", phase: "Judge", model: "kimi-code/k3", effort: "max", tokens: 90_000, ms: 60_000, result: {} },
   ];
   const { jpath } = writeRun("sessionful", { journal });
   const s = summarizeRun({ journalPath: jpath });
@@ -373,9 +373,9 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
 // be mislabeled "completed" — the breakdown reconciles to journaledAgents. Regression.
 {
   const journal = [
-    { key: "sess:s1#0", label: "oracle", phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 40_000, ms: 50_000, result: { summary: "ok" }, session: true, sessionId: "s1", turn: 0, status: "completed" },
-    { key: "sess:s2#0", label: "rival", phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 8_000, ms: 9_000, result: null, session: true, sessionId: "s2", turn: 0, status: "interrupted" },
-    { key: "j#0", label: "judge", phase: "Judge", model: "gpt-5.5", effort: "max", tokens: 50_000, ms: 30_000, result: {} },
+    { key: "sess:s1#0", label: "oracle", phase: "Explore", model: "kimi-code/k3", effort: "high", tokens: 40_000, ms: 50_000, result: { summary: "ok" }, session: true, sessionId: "s1", turn: 0, status: "completed" },
+    { key: "sess:s2#0", label: "rival", phase: "Explore", model: "kimi-code/k3", effort: "high", tokens: 8_000, ms: 9_000, result: null, session: true, sessionId: "s2", turn: 0, status: "interrupted" },
+    { key: "j#0", label: "judge", phase: "Judge", model: "kimi-code/k3", effort: "max", tokens: 50_000, ms: 30_000, result: {} },
   ];
   const { jpath } = writeRun("interrupted-turn", { journal });
   const s = summarizeRun({ journalPath: jpath });

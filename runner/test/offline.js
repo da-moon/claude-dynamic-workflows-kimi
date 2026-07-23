@@ -392,7 +392,7 @@ const exec = promisify(execFile);
   const j = new Journal(jpath, { reuse: false });
   await j.load();
   const echo = async (_p, o) => {
-    o.onMetrics?.({ ms: 42, model: "gpt-5.5", tokens: { input: 10, output: 5, reasoning: 3, total: 18 } });
+    o.onMetrics?.({ ms: 42, model: "kimi-code/k3", tokens: { input: 10, output: 5, reasoning: 3, total: 18 } });
     return "ok";
   };
   await runWorkflowSource(
@@ -412,7 +412,7 @@ const exec = promisify(execFile);
   assert.equal(lines[0].tokens, 18, "total tokens persisted");
   assert.equal(lines[0].tokensOut, 8, "output+reasoning persisted");
   assert.equal(lines[0].ms, 42, "wall time persisted");
-  assert.equal(lines[0].model, "gpt-5.5", "resolved model persisted");
+  assert.equal(lines[0].model, "kimi-code/k3", "resolved model persisted");
   assert.equal(lines[0].effort, "max", "lone agent under --auto-effort -> max");
   await rm(dir, { recursive: true, force: true });
 }
@@ -502,7 +502,7 @@ const exec = promisify(execFile);
 {
   const events = [];
   const echo = async (_p, o) => {
-    o.onMetrics?.({ ms: 10, model: "gpt-5.5", tokens: { input: 1, output: 1, reasoning: 0, total: 2 } });
+    o.onMetrics?.({ ms: 10, model: "kimi-code/k3", tokens: { input: 1, output: 1, reasoning: 0, total: 2 } });
     return "ok";
   };
   await runWorkflowSource(

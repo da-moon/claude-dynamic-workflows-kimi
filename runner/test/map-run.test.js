@@ -17,19 +17,19 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
 {
   const concept = [];
   for (let i = 0; i < 14; i++) {
-    concept.push({ label: `concept:persona-${i + 1}`, order: 10 + i, phase: "Concept", model: "gpt-5.5", effort: "high", tokens: 300000, ms: 4000, result: {} });
+    concept.push({ label: `concept:persona-${i + 1}`, order: 10 + i, phase: "Concept", model: "kimi-code/k3", effort: "high", tokens: 300000, ms: 4000, result: {} });
   }
   const run = {
     name: "forge",
     description: "",
     phases: [{ title: "Audit" }, { title: "Concept" }, { title: "Synthesize" }],
     agents: [
-      { label: "audit:hero", order: 0, phase: "Audit", model: "gpt-5.5", effort: "high", tokens: 300000, ms: 4200, result: { verdict: "ok" } },
-      { label: "audit:cta", order: 1, phase: "Audit", model: "gpt-5.5", effort: "high", tokens: 370000, ms: 5700, result: {} },
+      { label: "audit:hero", order: 0, phase: "Audit", model: "kimi-code/k3", effort: "high", tokens: 300000, ms: 4200, result: { verdict: "ok" } },
+      { label: "audit:cta", order: 1, phase: "Audit", model: "kimi-code/k3", effort: "high", tokens: 370000, ms: 5700, result: {} },
       ...concept,
-      { label: "synthesize:final", order: 99, phase: "Synthesize", model: "gpt-5.5", effort: "max", tokens: 1200000, ms: 22000, result: { recommended_direction: "Persona-3 bold" } },
+      { label: "synthesize:final", order: 99, phase: "Synthesize", model: "kimi-code/k3", effort: "max", tokens: 1200000, ms: 22000, result: { recommended_direction: "Persona-3 bold" } },
     ],
-    models: { "gpt-5.5": 17 },
+    models: { "kimi-code/k3": 17 },
     totals: { tokens: 8000000, ms: 140000, hasMetrics: true },
     counts: { phases: 3, agents: 17 },
     sources: {},
@@ -70,7 +70,7 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
 
 // 4) Color on → ANSI escapes present; off → none.
 {
-  const run = { name: "c", description: "", phases: [{ title: "P" }], agents: [{ label: "a", order: 0, phase: "P", model: "gpt-5.5", effort: "high", tokens: 1000, ms: 1000, result: {} }], models: { "gpt-5.5": 1 }, totals: { tokens: 1000, ms: 1000, hasMetrics: true }, counts: { phases: 1, agents: 1 }, sources: {} };
+  const run = { name: "c", description: "", phases: [{ title: "P" }], agents: [{ label: "a", order: 0, phase: "P", model: "kimi-code/k3", effort: "high", tokens: 1000, ms: 1000, result: {} }], models: { "kimi-code/k3": 1 }, totals: { tokens: 1000, ms: 1000, hasMetrics: true }, counts: { phases: 1, agents: 1 }, sources: {} };
   assert.match(renderMap(run, { color: true, width: 80 }), /\x1b\[/, "ANSI when color on");
   assert.doesNotMatch(renderMap(run, { color: false, width: 80 }), /\x1b\[/, "no ANSI when color off");
 }
@@ -82,8 +82,8 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
   await mkdir(jdir, { recursive: true });
   const jf = join(jdir, "r.workflow.jsonl");
   await writeFile(jf, [
-    JSON.stringify({ key: "a#0", label: "scan:x", result: { findings: [] }, phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 400000, ms: 5000 }),
-    JSON.stringify({ key: "b#0", label: "report", result: { recommended_direction: "ship it" }, phase: "Report", model: "gpt-5.5", effort: "max", tokens: 900000, ms: 12000 }),
+    JSON.stringify({ key: "a#0", label: "scan:x", result: { findings: [] }, phase: "Scan", model: "kimi-code/k3", effort: "high", tokens: 400000, ms: 5000 }),
+    JSON.stringify({ key: "b#0", label: "report", result: { recommended_direction: "ship it" }, phase: "Report", model: "kimi-code/k3", effort: "max", tokens: 900000, ms: 12000 }),
   ].join("\n"));
   const run = buildRunModel({ journalPath: jf, runDir: dir });
   const s = plain(renderMap(run, { color: false, width: 80 }));
@@ -120,7 +120,7 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
   await writeFile(join(jdir, "r.workflow.events.jsonl"), [
     JSON.stringify({ t: 1000, type: "start", label: "map:done", phase: "Map" }),
     JSON.stringify({ t: 2000, type: "end", label: "map:done", phase: "Map" }),
-    JSON.stringify({ t: 1500, type: "start", label: "map:live", phase: "Map", model: "gpt-5.5", effort: "high" }),
+    JSON.stringify({ t: 1500, type: "start", label: "map:live", phase: "Map", model: "kimi-code/k3", effort: "high" }),
   ].join("\n"));
   await writeFile(join(jdir, "r.workflow.progress.json"), JSON.stringify({ "map:live": "partial streamed output…", "map:done": "stale, should be ignored" }));
   const run = buildLiveRunModel({ journalPath: jf, runDir: dir });
@@ -136,8 +136,8 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
 // including a reportMarkdown shape (which the old "final agent" heuristic missed).
 {
   const base = { name: "r", description: "", phases: [{ title: "Synthesize" }],
-    agents: [{ label: "synthesize", order: 0, phase: "Synthesize", model: "gpt-5.5", effort: "max", tokens: 46000, ms: 130000, result: { reportMarkdown: "# Brief" } }],
-    models: { "gpt-5.5": 1 }, totals: { tokens: 46000, ms: 130000, hasMetrics: true }, counts: { phases: 1, agents: 1 }, sources: {} };
+    agents: [{ label: "synthesize", order: 0, phase: "Synthesize", model: "kimi-code/k3", effort: "max", tokens: 46000, ms: 130000, result: { reportMarkdown: "# Brief" } }],
+    models: { "kimi-code/k3": 1 }, totals: { tokens: 46000, ms: 130000, hasMetrics: true }, counts: { phases: 1, agents: 1 }, sources: {} };
   // report-shaped result → first prose line of the markdown
   const md = plain(renderMap({ ...base, result: { reportMarkdown: "# Title\n\nThe top recommendation is to ship the MVP first." } }, { color: false, width: 80 }));
   assert.match(md, /ship the MVP first/, "result node summarizes reportMarkdown");
@@ -179,8 +179,8 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
 {
   const run = {
     name: "t", description: "", phases: [{ title: "P" }],
-    agents: [{ label: "a", order: 0, phase: "P", model: "gpt-5.5", effort: "high", tokens: 1000, ms: 119600, result: {} }],
-    models: { "gpt-5.5": 1 }, totals: { tokens: 1000, ms: 119600, hasMetrics: true }, counts: { phases: 1, agents: 1 }, sources: {},
+    agents: [{ label: "a", order: 0, phase: "P", model: "kimi-code/k3", effort: "high", tokens: 1000, ms: 119600, result: {} }],
+    models: { "kimi-code/k3": 1 }, totals: { tokens: 1000, ms: 119600, hasMetrics: true }, counts: { phases: 1, agents: 1 }, sources: {},
   };
   const s = plain(renderMap(run, { color: false, width: 80 }));
   assert.match(s, /2m00s/, "119.6s formats as 2m00s");
@@ -190,10 +190,10 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
 // 7) liveState: running = a 'start' not yet matched by an 'end'; counts + timing.
 {
   const events = [
-    { t: 100, type: "start", label: "scan:a", phase: "Scan", model: "gpt-5.5", effort: "high" },
-    { t: 150, type: "start", label: "scan:b", phase: "Scan", model: "gpt-5.5", effort: "high" },
+    { t: 100, type: "start", label: "scan:a", phase: "Scan", model: "kimi-code/k3", effort: "high" },
+    { t: 150, type: "start", label: "scan:b", phase: "Scan", model: "kimi-code/k3", effort: "high" },
     { t: 400, type: "end", label: "scan:a", phase: "Scan", tokens: 1000, ms: 300 },
-    { t: 420, type: "start", label: "report", phase: "Report", model: "gpt-5.5", effort: "max" },
+    { t: 420, type: "start", label: "report", phase: "Report", model: "kimi-code/k3", effort: "max" },
   ];
   const ls = liveState(events);
   assert.deepEqual(ls.running.map((r) => r.label).sort(), ["report", "scan:b"], "b + report running; a done");
@@ -207,10 +207,10 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
   const run = {
     name: "live", description: "", phases: [{ title: "Scan" }],
     agents: [
-      { label: "scan:a", order: 0, phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 400000, ms: 5000, result: {} },
-      { label: "scan:b", order: 1, phase: "Scan", model: "gpt-5.5", effort: "high", tokens: null, ms: null, result: undefined, status: "running", startedAt: 1000 },
+      { label: "scan:a", order: 0, phase: "Scan", model: "kimi-code/k3", effort: "high", tokens: 400000, ms: 5000, result: {} },
+      { label: "scan:b", order: 1, phase: "Scan", model: "kimi-code/k3", effort: "high", tokens: null, ms: null, result: undefined, status: "running", startedAt: 1000 },
     ],
-    models: { "gpt-5.5": 2 }, totals: { tokens: 400000, ms: 5000, hasMetrics: true }, counts: { phases: 1, agents: 2 }, sources: {},
+    models: { "kimi-code/k3": 2 }, totals: { tokens: 400000, ms: 5000, hasMetrics: true }, counts: { phases: 1, agents: 2 }, sources: {},
   };
   const s = plain(renderMap(run, { color: false, width: 88, now: 9000, spinner: "⠹" }));
   assert.match(s, /1 done · 1 running/, "phase header shows the done/running split");
@@ -227,11 +227,11 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
   const jdir = join(dir, ".workflow-journal");
   await mkdir(jdir, { recursive: true });
   await writeFile(join(jdir, "r.workflow.jsonl"),
-    JSON.stringify({ key: "a#0", label: "rank:bucket-1", result: { order: [] }, phase: "Rank", model: "gpt-5.5", effort: "high", tokens: 22000, ms: 37000 }));
+    JSON.stringify({ key: "a#0", label: "rank:bucket-1", result: { order: [] }, phase: "Rank", model: "kimi-code/k3", effort: "high", tokens: 22000, ms: 37000 }));
   await writeFile(join(jdir, "r.workflow.events.jsonl"), [
-    JSON.stringify({ t: 100, type: "start", label: "rank:bucket-1", phase: "Rank", model: "gpt-5.5", effort: "high" }),
+    JSON.stringify({ t: 100, type: "start", label: "rank:bucket-1", phase: "Rank", model: "kimi-code/k3", effort: "high" }),
     JSON.stringify({ t: 37100, type: "end", label: "rank:bucket-1", phase: "Rank", tokens: 22000, ms: 37000 }),
-    JSON.stringify({ t: 37200, type: "start", label: "merge:final", phase: "Merge", model: "gpt-5.5", effort: "max" }),
+    JSON.stringify({ t: 37200, type: "start", label: "merge:final", phase: "Merge", model: "kimi-code/k3", effort: "max" }),
   ].join("\n"));
 
   const loc = locateRun({ target: dir });
@@ -254,8 +254,8 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
 
   const run = {
     name: "news", description: "", phases: [{ title: "Gather" }],
-    agents: [{ label: "gather:indices", order: 0, phase: "Gather", model: "gpt-5.5", effort: "high", tokens: 52000, ms: 86000, result: { summary: "S&P 500 rose 0.4% to a record 6,012 at the close.", sources: ["http://x"] } }],
-    models: { "gpt-5.5": 1 }, totals: { tokens: 52000, ms: 86000, hasMetrics: true }, counts: { phases: 1, agents: 1 }, sources: {},
+    agents: [{ label: "gather:indices", order: 0, phase: "Gather", model: "kimi-code/k3", effort: "high", tokens: 52000, ms: 86000, result: { summary: "S&P 500 rose 0.4% to a record 6,012 at the close.", sources: ["http://x"] } }],
+    models: { "kimi-code/k3": 1 }, totals: { tokens: 52000, ms: 86000, hasMetrics: true }, counts: { phases: 1, agents: 1 }, sources: {},
   };
   const s = plain(renderMap(run, { color: false, width: 92 }));
   assert.match(s, /╭─ ◆ news/, "orchestrator node-box");
@@ -273,10 +273,10 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
   await mkdir(jdir, { recursive: true });
   const jf = join(jdir, "race.workflow.jsonl");
   await writeFile(jf, [
-    JSON.stringify({ key: "sess:s1#0", label: "oracle", result: { summary: "Repo ingested; 14 modules mapped." }, phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 52000, ms: 86000, session: true, sessionId: "s1", turn: 0, status: "completed", threadId: "th-1" }),
-    JSON.stringify({ key: "sess:s1#1", label: "oracle", result: { summary: "Auth flows traced." }, phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 30000, ms: 40000, session: true, sessionId: "s1", turn: 1, status: "completed", threadId: "th-1" }),
-    JSON.stringify({ key: "sess:s2#0", label: "rival", result: null, phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 12000, ms: 20000, session: true, sessionId: "s2", turn: 0, status: "cancelled", threadId: "th-2" }),
-    JSON.stringify({ key: "j#0", label: "judge:final", result: { one_line_verdict: "Oracle wins." }, phase: "Judge", model: "gpt-5.5", effort: "max", tokens: 90000, ms: 60000 }),
+    JSON.stringify({ key: "sess:s1#0", label: "oracle", result: { summary: "Repo ingested; 14 modules mapped." }, phase: "Explore", model: "kimi-code/k3", effort: "high", tokens: 52000, ms: 86000, session: true, sessionId: "s1", turn: 0, status: "completed", threadId: "th-1" }),
+    JSON.stringify({ key: "sess:s1#1", label: "oracle", result: { summary: "Auth flows traced." }, phase: "Explore", model: "kimi-code/k3", effort: "high", tokens: 30000, ms: 40000, session: true, sessionId: "s1", turn: 1, status: "completed", threadId: "th-1" }),
+    JSON.stringify({ key: "sess:s2#0", label: "rival", result: null, phase: "Explore", model: "kimi-code/k3", effort: "high", tokens: 12000, ms: 20000, session: true, sessionId: "s2", turn: 0, status: "cancelled", threadId: "th-2" }),
+    JSON.stringify({ key: "j#0", label: "judge:final", result: { one_line_verdict: "Oracle wins." }, phase: "Judge", model: "kimi-code/k3", effort: "max", tokens: 90000, ms: 60000 }),
   ].join("\n"));
   const run = buildRunModel({ journalPath: jf, runDir: dir });
   assert.equal(run.sessions.length, 2, "two workers grouped from turn agents");
@@ -301,11 +301,11 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
   const jdir = join(dir, ".workflow-journal");
   await mkdir(jdir, { recursive: true });
   const jf = join(jdir, "warm.workflow.jsonl");
-  await writeFile(jf, JSON.stringify({ key: "sess:s1#0", label: "oracle", result: { summary: "Loaded." }, phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 52000, ms: 86000, session: true, sessionId: "s1", turn: 0, status: "completed" }));
+  await writeFile(jf, JSON.stringify({ key: "sess:s1#0", label: "oracle", result: { summary: "Loaded." }, phase: "Explore", model: "kimi-code/k3", effort: "high", tokens: 52000, ms: 86000, session: true, sessionId: "s1", turn: 0, status: "completed" }));
   await writeFile(join(jdir, "warm.workflow.events.jsonl"), [
-    JSON.stringify({ t: 100, type: "start", id: "sess:s1#0", label: "oracle", phase: "Explore", model: "gpt-5.5", effort: "high", kind: "session", sessionId: "s1", turn: 0 }),
+    JSON.stringify({ t: 100, type: "start", id: "sess:s1#0", label: "oracle", phase: "Explore", model: "kimi-code/k3", effort: "high", kind: "session", sessionId: "s1", turn: 0 }),
     JSON.stringify({ t: 86100, type: "end", id: "sess:s1#0", label: "oracle", phase: "Explore", kind: "session", sessionId: "s1", turn: 0, status: "completed", tokens: 52000, ms: 86000 }),
-    JSON.stringify({ t: 90000, type: "start", id: "sess:s1#1", label: "oracle", phase: "Explore", model: "gpt-5.5", effort: "high", kind: "session", sessionId: "s1", turn: 1 }),
+    JSON.stringify({ t: 90000, type: "start", id: "sess:s1#1", label: "oracle", phase: "Explore", model: "kimi-code/k3", effort: "high", kind: "session", sessionId: "s1", turn: 1 }),
   ].join("\n"));
   const run = buildLiveRunModel({ journalPath: jf, runDir: dir });
   assert.equal(run.sessions.length, 1, "still ONE worker with a running steer");
@@ -324,11 +324,11 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
 {
   const agents = [];
   for (let i = 0; i < 14; i++) {
-    agents.push({ key: `a${i}#0`, label: `scan:f${i}`, result: { ok: 1 }, phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 100000, ms: 3000 });
+    agents.push({ key: `a${i}#0`, label: `scan:f${i}`, result: { ok: 1 }, phase: "Scan", model: "kimi-code/k3", effort: "high", tokens: 100000, ms: 3000 });
   }
   // one worker (2 turns) appended last → highest order → would sort into "+N more"
-  agents.push({ key: "sess:s1#0", label: "oracle", result: { summary: "Loaded." }, phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 52000, ms: 80000, session: true, sessionId: "s1", turn: 0, status: "completed", threadId: "th-1" });
-  agents.push({ key: "sess:s1#1", label: "oracle", result: { summary: "Traced." }, phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 30000, ms: 40000, session: true, sessionId: "s1", turn: 1, status: "completed", threadId: "th-1" });
+  agents.push({ key: "sess:s1#0", label: "oracle", result: { summary: "Loaded." }, phase: "Scan", model: "kimi-code/k3", effort: "high", tokens: 52000, ms: 80000, session: true, sessionId: "s1", turn: 0, status: "completed", threadId: "th-1" });
+  agents.push({ key: "sess:s1#1", label: "oracle", result: { summary: "Traced." }, phase: "Scan", model: "kimi-code/k3", effort: "high", tokens: 30000, ms: 40000, session: true, sessionId: "s1", turn: 1, status: "completed", threadId: "th-1" });
   const dir = await mkdtemp(join(tmpdir(), "wf-map-pin-"));
   const jdir = join(dir, ".workflow-journal");
   await mkdir(jdir, { recursive: true });
@@ -349,17 +349,17 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
 //     must not fold the worker being watched live.
 {
   const agents = [];
-  for (let i = 0; i < 14; i++) agents.push({ key: `b${i}#0`, label: `scan:g${i}`, result: { ok: 1 }, phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 90000, ms: 3000 });
-  agents.push({ key: "sess:w1#0", label: "watcher", result: { summary: "Loaded." }, phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 40000, ms: 50000, session: true, sessionId: "w1", turn: 0, status: "completed", threadId: "th-w" });
+  for (let i = 0; i < 14; i++) agents.push({ key: `b${i}#0`, label: `scan:g${i}`, result: { ok: 1 }, phase: "Scan", model: "kimi-code/k3", effort: "high", tokens: 90000, ms: 3000 });
+  agents.push({ key: "sess:w1#0", label: "watcher", result: { summary: "Loaded." }, phase: "Scan", model: "kimi-code/k3", effort: "high", tokens: 40000, ms: 50000, session: true, sessionId: "w1", turn: 0, status: "completed", threadId: "th-w" });
   const dir = await mkdtemp(join(tmpdir(), "wf-map-pinlive-"));
   const jdir = join(dir, ".workflow-journal");
   await mkdir(jdir, { recursive: true });
   const jf = join(jdir, "wl.workflow.jsonl");
   await writeFile(jf, agents.map((a) => JSON.stringify(a)).join("\n"));
   await writeFile(join(jdir, "wl.workflow.events.jsonl"), [
-    JSON.stringify({ t: 100, type: "start", id: "sess:w1#0", label: "watcher", phase: "Scan", model: "gpt-5.5", effort: "high", kind: "session", sessionId: "w1", turn: 0 }),
+    JSON.stringify({ t: 100, type: "start", id: "sess:w1#0", label: "watcher", phase: "Scan", model: "kimi-code/k3", effort: "high", kind: "session", sessionId: "w1", turn: 0 }),
     JSON.stringify({ t: 50100, type: "end", id: "sess:w1#0", label: "watcher", phase: "Scan", kind: "session", sessionId: "w1", turn: 0, status: "completed", tokens: 40000, ms: 50000 }),
-    JSON.stringify({ t: 60000, type: "start", id: "sess:w1#1", label: "watcher", phase: "Scan", model: "gpt-5.5", effort: "high", kind: "session", sessionId: "w1", turn: 1 }),
+    JSON.stringify({ t: 60000, type: "start", id: "sess:w1#1", label: "watcher", phase: "Scan", model: "kimi-code/k3", effort: "high", kind: "session", sessionId: "w1", turn: 1 }),
   ].join("\n"));
   const run = buildLiveRunModel({ journalPath: jf, runDir: dir });
   const s = plain(renderMap(run, { color: false, width: 88, maxAgents: 12, now: 65000 }));
