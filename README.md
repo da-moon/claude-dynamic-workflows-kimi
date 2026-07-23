@@ -111,7 +111,7 @@ Behind that one line, Kimi:
 1. **Preflights** Kimi CLI — confirms it is reachable and notes the latest frontier model.
 2. **Compiles** your rough intent into a concrete harness — picks the scale, archetype, and pattern, builds a task contract, and states its assumptions (no external "metaprompt" needed).
 3. **Authors** a workflow script into your project (`./<name>.workflow.js`) — so you can read it, tweak it, and rerun it.
-4. **Runs** it via Kimi CLI, pinning **every agent to the latest frontier model** and **scaling thinking effort to the harness** — a small run goes flat `--effort medium`, while a bigger one uses `--auto-effort` so a lone judge/synthesize gate gets the policy's extra-high tier (`xhigh`) and wide fan-outs floor at `high`.
+4. **Runs** it via Kimi CLI, pinning **every agent to the latest frontier model** and **scaling reasoning effort to the harness** — a small run goes flat `--effort low`, while a bigger one uses `--auto-effort` so a lone judge/synthesize gate gets the policy's top tier (`max`) and wide fan-outs floor at `high`.
 5. **Surfaces** the outcome right in the conversation — a summary, the script path, and the run's **execution map rendered inline** as text:
 
 ```text
@@ -129,7 +129,7 @@ Behind that one line, Kimi:
       Several megacap earnings beat after the bell; Fed stayed data-dependent.
   ┄ barrier · Gather → Synthesize ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
   ▼ ② Synthesize ──────────────────────────────────  1 agent · 79k tok · 2m49s
-  ╰─✓ brief      gpt-5.5  xhigh      79k   2m49s
+  ╰─✓ brief      gpt-5.5  max        79k   2m49s
       Fed, jobs and AI earnings kept stocks near records into June 3.
   │
   ▼
@@ -160,7 +160,7 @@ You don't manage flags; you describe what you want and Claude wires it up. Commo
 | **Pick a specific pattern** | "do a loop-until-dry bug hunt" · "fresh-context review with independent reviewers" | authors that exact pattern (see the [pattern library](references/authoring.md)) |
 | **Run a supervised fleet** | "`--multi`" · "throw a few different harnesses at this at once" | launches 2–4 concurrent variant workflows in the background and **supervises them itself** — polls `fleet status`, answers their gates, steers, kills dead ends, forks winners, then synthesizes across runs (see walkthrough 8) |
 
-One thing you *don't* tune: it's always **one frontier model for every agent** — no model-mixing. Thinking **effort** scales to the harness instead (a quick 2–5-agent run goes flat `--effort medium`; bigger runs use `--auto-effort`, so lone judge/synthesis gates think hardest). **To spend less**, lower the **budget**, drop the **effort**, narrow the **fan-out**, and **`--plan` first** to size it — never a smaller model. (Read-only is a **containment** setting — agents run cwd-isolated so writes can't dirty your tree — not a cost lever; see [Safety](#safety).)
+One thing you *don't* tune: it's always **one frontier model for every agent** — no model-mixing. Reasoning **effort** scales to the harness instead (a quick 2–5-agent run goes flat `--effort low`; bigger runs use `--auto-effort`, so lone judge/synthesis gates think hardest). **To spend less**, lower the **budget**, drop the **effort**, narrow the **fan-out**, and **`--plan` first** to size it — never a smaller model. (Read-only is a **containment** setting — agents run cwd-isolated so writes can't dirty your tree — not a cost lever; see [Safety](#safety).)
 
 ### Example invocations
 
@@ -222,7 +222,7 @@ Each of these is **one rough sentence** to `/kimi-workflows`. Claude compiles it
 
 > `/kimi-workflows  Checkout p99 just spiked 12×. Triage the signals, race a few root-cause theories, confirm the leading one, and propose a fix — read-only, and ask me before you suggest shipping anything.`
 
-Claude authors a **root-cause lab**: a parallel **Triage** (metrics · logs · recent deploys), then a **Hunt** that *races three live workers* — one per hypothesis (N+1 query, pool exhaustion, cache stampede). The first to land wins; the runtime **cancels the other two** (you don't pay for the slowest). The winning worker is then **steered on its warm thread** — "confirm on the held repro" — a cheap second turn that doesn't re-read anything (141k tokens for the hunt → 47k for the confirmation). It **pauses at a `human()` gate** for the ship decision, then a lone `xhigh` synthesizer writes the patch + a regression test. The whole run is the hero image above; click the **n+1** worker for the per-turn timeline, and the live run shows the **answer card** (the cockpit screenshot). Bundled — open it with `node runner/bin/view-run.js examples/incident-demo --open`.
+Claude authors a **root-cause lab**: a parallel **Triage** (metrics · logs · recent deploys), then a **Hunt** that *races three live workers* — one per hypothesis (N+1 query, pool exhaustion, cache stampede). The first to land wins; the runtime **cancels the other two** (you don't pay for the slowest). The winning worker is then **steered on its warm thread** — "confirm on the held repro" — a cheap second turn that doesn't re-read anything (141k tokens for the hunt → 47k for the confirmation). It **pauses at a `human()` gate** for the ship decision, then a lone `max` synthesizer writes the patch + a regression test. The whole run is the hero image above; click the **n+1** worker for the per-turn timeline, and the live run shows the **answer card** (the cockpit screenshot). Bundled — open it with `node runner/bin/view-run.js examples/incident-demo --open`.
 
 ### 2 · Audit a codebase for a class of bug — and trust the result
 
@@ -456,7 +456,7 @@ for (const s of first.pendingSessions) await s.cancel();           // stop the l
 - **Race and cut losers** — fire several strategies at one problem, keep the first that works, cancel the rest.
 - **Follow the evidence** — a controller agent chases the strongest lead instead of a question list frozen at author time.
 
-**Measured, not asserted** ([`examples/benchmarks/`](examples/benchmarks)): on the current Kimi backend (kimi-code 0.23.3, effort medium), a warm worker answered each follow-up **~1.6× cheaper in (estimated) tokens and ~1.8× faster per turn** than cold one-shots, cumulative tokens ahead by the second question. (The pre-port GPT-5.5 run measured ~3×/~16×, but its token accounting is not comparable — see the benchmark README's caveats.)
+**Measured, not asserted** ([`examples/benchmarks/`](examples/benchmarks)): on the current Kimi backend (kimi-code 0.23.3, at the then-current `medium` effort), a warm worker answered each follow-up **~1.6× cheaper in (estimated) tokens and ~1.8× faster per turn** than cold one-shots, cumulative tokens ahead by the second question. (The pre-port GPT-5.5 run measured ~3×/~16×, but its token accounting is not comparable — see the benchmark README's caveats.)
 
 **Runnable examples** (all `--plan`-safe — dry-run any with `--plan`, no Kimi, no tokens):
 `sessionful-workers` (the intro) · `warm-context-interrogation` (load once, ask many) · `hedged-take-first-win` (race + cancel) · `flaky-bug-perturbation` (hold a repro, perturb it) · `lead-following-research` (controller chases leads) · `stateful-dialogue` (memory vs. a cold judge) · `agent-foreman` (supervised autonomy, escalate at forks) · `human-gate` (pause at a declared fork, answer in the live viewer, steer the warm worker).

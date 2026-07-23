@@ -41,7 +41,7 @@ const CURRENT_COMPLETED = `
       data-dependent.
   ┄┄┄┄┄┄┄┄┄┄ barrier ┄┄┄┄┄┄┄┄┄┄┄
   ▼ ② Synthesize ──────────────────────────────────  1 agent · 79k tok · 2m49s
-  ╰─✓ brief      5.5  xhigh    79k tok  2m49s
+  ╰─✓ brief      5.5  max      79k tok  2m49s
       Fed, jobs and AI earnings kept stocks near records into June 3.
   │
   ▼

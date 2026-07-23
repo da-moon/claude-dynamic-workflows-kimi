@@ -41,7 +41,7 @@ const fs = require("node:fs");
 const args = process.argv.slice(2);
 if (args[0] === "provider") {
   // Shape of \`kimi provider list --json\` on kimi-code 0.27.0 (the CONFIGURED set),
-  // including the max-only k3 frontier tier that opus / --frontier now map onto.
+  // including the k3 frontier tier that opus / --frontier now map onto.
   process.stdout.write(JSON.stringify({
     providers: { "managed:kimi-code": { type: "kimi" } },
     models: {
@@ -135,27 +135,28 @@ try {
     resetMeter();
   }
 
-  // 5) Effort suppression for k3. k3 is the max-only frontier tier: its reasoning
-  //    effort is automatic (no --effort knob), so buildFullPrompt must NOT prepend
-  //    a "(thinking effort: X)" hint when the RESOLVED model is k3 — but must keep
-  //    it for a non-k3 model given the SAME effort. Asserted on the real recorded
-  //    -p prompt, through resolveModel + buildFullPrompt + spawn.
+  // 5) Reasoning-effort hint. Kimi's ladder is low | high | max (Moonshot's
+  //    top-level reasoning_effort field); the CLI has no headless effort flag, so
+  //    buildFullPrompt conveys it as a "(reasoning effort: X)" prompt annotation.
+  //    It is applied UNIFORMLY — including the k3 frontier tier, which accepts
+  //    low/high/max per Moonshot's docs. Asserted on the real recorded -p prompt,
+  //    through resolveModel + buildFullPrompt + spawn.
   {
-    // k3 arm: "opus" resolves onto the configured kimi-code/k3.
+    // k3 arm: "opus" resolves onto the configured kimi-code/k3, and the hint is present.
     await rm(argvLog, { force: true });
     await kimiAgent("investigate the crash", { model: "opus", effort: "high", retries: 0 });
     const [k3Args] = await promptCalls();
     assert.equal(k3Args[k3Args.indexOf("--model") + 1], "kimi-code/k3", "sanity: opus resolved to the k3 tier");
-    assert.doesNotMatch(
+    assert.match(
       k3Args[1],
-      /\(thinking effort:/,
-      "k3 turn with effort:'high' -> the effort hint is SUPPRESSED (max-only, automatic effort)",
+      /\(reasoning effort: high\)/,
+      "k3 turn with effort:'high' -> the '(reasoning effort: high)' hint IS present (k3 accepts low/high/max)",
     );
 
-    // non-k3 arm: "haiku" resolves onto kimi-code/kimi-for-coding-highspeed. Same
-    // effort, and the hint IS present — proving the suppression is k3-specific.
+    // non-k3 arm: "haiku" resolves onto kimi-code/kimi-for-coding-highspeed. A
+    // different tier (low) still injects — the hint is model-agnostic.
     await rm(argvLog, { force: true });
-    await kimiAgent("investigate the crash", { model: "haiku", effort: "high", retries: 0 });
+    await kimiAgent("investigate the crash", { model: "haiku", effort: "low", retries: 0 });
     const [nonK3Args] = await promptCalls();
     assert.equal(
       nonK3Args[nonK3Args.indexOf("--model") + 1],
@@ -164,8 +165,8 @@ try {
     );
     assert.match(
       nonK3Args[1],
-      /\(thinking effort: high\)/,
-      "non-k3 turn with the same effort KEEPS the '(thinking effort: high)' hint",
+      /\(reasoning effort: low\)/,
+      "non-k3 turn KEEPS the '(reasoning effort: low)' hint",
     );
   }
 

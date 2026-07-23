@@ -50,7 +50,7 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
   const journal = [
     { key: "a#0", label: "scan:auth", phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 400_000, ms: 4000, result: { findings: [{ x: 1 }] } },
     { key: "b#0", label: "scan:routes", phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 300_000, ms: 6000, result: { findings: [] } },
-    { key: "c#0", label: "report", phase: "Report", model: "gpt-5.5", effort: "xhigh", tokens: 900_000, ms: 12_000, result: { headline: "one real issue" } },
+    { key: "c#0", label: "report", phase: "Report", model: "gpt-5.5", effort: "max", tokens: 900_000, ms: 12_000, result: { headline: "one real issue" } },
   ];
   const events = [
     { t: 1000, type: "start", label: "scan:auth", phase: "Scan" },
@@ -113,31 +113,20 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
   ok("old metric-less journal: lower-bound warnings, journal-only");
 }
 
-// 3b) k3 SUPPRESSES the implicit-effort ("default-effort-cost") advice. k3 is the
-//     max-only frontier tier — its reasoning effort is automatic and there is no
-//     --effort/--auto-effort knob — so the "set an explicit effort" advice is moot
-//     once the run resolved to k3. Two independent triggers suppress it; a run that
-//     is NOT fully k3 must still warn (guards the runIsK3 gate, incl. its .every()).
+// 3b) The implicit-effort ("default-effort-cost") advice fires for ANY run with
+//     effort-less agents — including k3. k3 accepts low/high/max (Moonshot's
+//     reasoning_effort field), so "set an explicit effort" is actionable there
+//     too; the old max-only carve-out is gone. Whether it warns vs informs
+//     depends only on how many agents ran effort-less, not on the model.
 {
-  // (i) meta.model pins k3 → suppressed even though the effort-less agents recorded
-  //     a NON-k3 model id (isolates the `isK3(meta?.model)` branch of the gate).
-  const jPinned = [
-    { key: "a#0", label: "scan:a", phase: "Scan", model: "kimi-code/kimi-for-coding", tokens: 100_000, ms: 1000, result: { ok: 1 } },
-    { key: "b#0", label: "scan:b", phase: "Scan", model: "kimi-code/kimi-for-coding", tokens: 100_000, ms: 1000, result: { ok: 1 } },
-  ];
-  const sPinned = summarizeRun({ journalPath: writeRun("k3-pinned", { journal: jPinned, meta: { model: "kimi-code/k3", autoEffort: false } }).jpath });
-  assert.equal(codes(sPinned).includes("default-effort-cost"), false, "meta.model=k3 → implicit-effort advice suppressed (k3 is max-only)");
-
-  // (ii) no k3 meta, but EVERY effort-less agent already ran on k3 → suppressed
-  //      (isolates the `effortlessAgents.every(isK3)` branch of the gate).
-  const jAllK3 = Array.from({ length: 4 }, (_, i) => ({
+  // (i) a k3-pinned run with 4 effort-less agents still surfaces the advice as a warn.
+  const jPinned = Array.from({ length: 4 }, (_, i) => ({
     key: "a" + i + "#0", label: "scan:" + i, phase: "Scan", model: "kimi-code/k3", tokens: 100_000, ms: 1000, result: { ok: 1 },
   }));
-  const sAllK3 = summarizeRun({ journalPath: writeRun("k3-agents", { journal: jAllK3 }).jpath });
-  assert.equal(codes(sAllK3).includes("default-effort-cost"), false, "all effort-less agents on k3 → advice suppressed with no meta model");
+  const sPinned = summarizeRun({ journalPath: writeRun("k3-pinned", { journal: jPinned, meta: { model: "kimi-code/k3", autoEffort: false } }).jpath });
+  assert.equal(codes(sPinned, "warn").includes("default-effort-cost"), true, "k3 run with implicit effort still WARNS (k3 accepts low/high/max)");
 
-  // (iii) a MIXED run (one k3 agent, the rest non-k3, all effort-less) STILL warns —
-  //       the gate uses .every(), not .some(): a single non-k3 agent keeps the advice.
+  // (ii) a non-k3 run with implicit effort also warns — the advice is model-agnostic.
   const jMixed = [
     { key: "a#0", label: "scan:a", phase: "Scan", model: "kimi-code/k3", tokens: 100_000, ms: 1000, result: { ok: 1 } },
     { key: "b#0", label: "scan:b", phase: "Scan", model: "kimi-code/kimi-for-coding", tokens: 100_000, ms: 1000, result: { ok: 1 } },
@@ -145,8 +134,8 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
     { key: "d#0", label: "scan:d", phase: "Scan", model: "kimi-code/kimi-for-coding", tokens: 100_000, ms: 1000, result: { ok: 1 } },
   ];
   const sMixed = summarizeRun({ journalPath: writeRun("mixed-nonk3", { journal: jMixed }).jpath });
-  assert.equal(codes(sMixed, "warn").includes("default-effort-cost"), true, "a mixed/non-k3 run with implicit effort still WARNS");
-  ok("k3 suppresses implicit-effort advice (pinned meta or all-k3 agents); a non-k3 run still warns");
+  assert.equal(codes(sMixed, "warn").includes("default-effort-cost"), true, "a non-k3 run with implicit effort also WARNS");
+  ok("implicit-effort advice fires for any run incl. k3 (max-only carve-out removed)");
 }
 
 // 4) Resumed run: event sidecar with cached replays + an interrupted agent.
@@ -247,7 +236,7 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
 
 // 9) Result sidecar + --include-result: result attached and previewed; omitted otherwise.
 {
-  const journal = [{ key: "s#0", label: "synthesize", phase: "Synthesize", model: "gpt-5.5", effort: "xhigh", tokens: 50_000, ms: 9000, result: { headline: "internal" } }];
+  const journal = [{ key: "s#0", label: "synthesize", phase: "Synthesize", model: "gpt-5.5", effort: "max", tokens: 50_000, ms: 9000, result: { headline: "internal" } }];
   const result = { headline: "Ship the state-preserving viewer", quick_wins: ["atomic writes"] };
   const { jpath } = writeRun("withresult", { journal, result });
   const plain = summarizeRun({ journalPath: jpath });
@@ -273,7 +262,7 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
   const big = summarizeRun({ journalPath: writeRun("big", { journal: [
     { key: "a#0", label: "scan:a", phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 100_000, ms: 1000, result: 1 },
     { key: "b#0", label: "scan:b", phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 100_000, ms: 1000, result: 2 },
-    { key: "c#0", label: "report", phase: "Report", model: "gpt-5.5", effort: "xhigh", tokens: 300_000, ms: 4000, result: 3 },
+    { key: "c#0", label: "report", phase: "Report", model: "gpt-5.5", effort: "max", tokens: 300_000, ms: 4000, result: 3 },
   ] }).jpath });
   const bigOut = renderEndOfRun(big);
   assert.match(bigOut, /Scan/);
@@ -301,7 +290,7 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
 {
   const { dir, jpath } = writeRun("e2e", { journal: [
     { key: "a#0", label: "scan:a", phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 400_000, ms: 4000, result: { findings: [] } },
-    { key: "b#0", label: "report", phase: "Report", model: "gpt-5.5", effort: "xhigh", tokens: 900_000, ms: 12_000, result: { headline: "done" } },
+    { key: "b#0", label: "report", phase: "Report", model: "gpt-5.5", effort: "max", tokens: 900_000, ms: 12_000, result: { headline: "done" } },
   ] });
   const text = execFileSync("node", [BIN, "--journal", jpath], { encoding: "utf8" });
   assert.match(text, /Run summary · e2e/);
@@ -321,7 +310,7 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
   const journal = [
     { key: "x#0", label: "scan:a", phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 450_000, ms: 5000, result: {} },
     { key: "y#0", label: "scan:b", phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 450_000, ms: 5000, result: {} },
-    { key: "z#0", label: "report", phase: "Report", model: "gpt-5.5", effort: "xhigh", tokens: 300_000, ms: 4000, result: {} },
+    { key: "z#0", label: "report", phase: "Report", model: "gpt-5.5", effort: "max", tokens: 300_000, ms: 4000, result: {} },
   ];
   // resume: the two scans replay from cache (0 tokens this run); only report executes.
   const events = [
@@ -353,7 +342,7 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
     { key: "sess:s1#1", label: "oracle", phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 30_000, ms: 40_000, result: { summary: "traced" }, session: true, sessionId: "s1", turn: 1, status: "completed" },
     { key: "sess:s2#0", label: "rival", phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 12_000, ms: 20_000, result: null, session: true, sessionId: "s2", turn: 0, status: "cancelled" },
     { key: "sess:s3#0", label: "flaky", phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 8_000, ms: 9_000, result: null, session: true, sessionId: "s3", turn: 0, status: "failed" },
-    { key: "j#0", label: "judge:final", phase: "Judge", model: "gpt-5.5", effort: "xhigh", tokens: 90_000, ms: 60_000, result: {} },
+    { key: "j#0", label: "judge:final", phase: "Judge", model: "gpt-5.5", effort: "max", tokens: 90_000, ms: 60_000, result: {} },
   ];
   const { jpath } = writeRun("sessionful", { journal });
   const s = summarizeRun({ journalPath: jpath });
@@ -386,7 +375,7 @@ const ok = (m) => { n++; console.log("  ✓ " + m); };
   const journal = [
     { key: "sess:s1#0", label: "oracle", phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 40_000, ms: 50_000, result: { summary: "ok" }, session: true, sessionId: "s1", turn: 0, status: "completed" },
     { key: "sess:s2#0", label: "rival", phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 8_000, ms: 9_000, result: null, session: true, sessionId: "s2", turn: 0, status: "interrupted" },
-    { key: "j#0", label: "judge", phase: "Judge", model: "gpt-5.5", effort: "xhigh", tokens: 50_000, ms: 30_000, result: {} },
+    { key: "j#0", label: "judge", phase: "Judge", model: "gpt-5.5", effort: "max", tokens: 50_000, ms: 30_000, result: {} },
   ];
   const { jpath } = writeRun("interrupted-turn", { journal });
   const s = summarizeRun({ journalPath: jpath });

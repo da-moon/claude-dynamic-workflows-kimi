@@ -113,7 +113,7 @@ const verified = verdicts.filter(Boolean).filter((c) => c.verdict && c.verdict.r
 const dropped = verdicts.filter(Boolean).length - verified.length;
 log(`${verified.length} claims survived cross-check, ${dropped} dropped`);
 
-// Report: one synthesizer (a lone gate → xhigh under --auto-effort) writes the
+// Report: one synthesizer (a lone gate → max under --auto-effort) writes the
 // cited report. It RETURNS the prose (per the "heavy final stage" guidance) rather
 // than writing a file, so a long synthesis can't trip the per-turn timeout.
 phase("Report");

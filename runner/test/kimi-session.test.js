@@ -136,32 +136,31 @@ try {
     assert.deepEqual(outcome.result, { answer: 42 });
     assert.match(fakeCalls[0].prompt, /"required":\s*\[\s*"answer"\s*\]/, "the embedded schema is strictified (required filled in)");
     assert.match(fakeCalls[0].prompt, /"additionalProperties":\s*false/, "the embedded schema is strictified (additionalProperties:false)");
-    assert.match(fakeCalls[0].prompt, /\(thinking effort: high\)/, "effort is embedded in the prompt");
+    assert.match(fakeCalls[0].prompt, /\(reasoning effort: high\)/, "effort is embedded in the prompt");
     assert.equal(fakeCalls[0].opts.schema, undefined, "schema is embedded by the driver, never forwarded to the agent seam");
     assert.equal(fakeCalls[0].opts.effort, undefined, "effort is embedded by the driver, never forwarded to the agent seam");
   }
 
-  // 6b) Effort suppression for k3 (mirrors #6's positive assertion). k3 is the
-  //     max-only frontier tier — automatic reasoning effort, no --effort knob —
-  //     so _buildPrompt must NOT embed a "(thinking effort: X)" hint for a k3
-  //     model, but MUST keep it for a non-k3 model given the same effort.
+  // 6b) Reasoning-effort hint applies uniformly, including k3 (mirrors #6's
+  //     positive assertion). k3 accepts low/high/max per Moonshot's docs, so
+  //     _buildPrompt embeds "(reasoning effort: X)" for it too — not suppressed.
   {
     resetFake(["ok"]);
     const k3 = new KimiSessionDriver({ model: "kimi-code/k3", systemPrompt: "sys", cwd: process.cwd(), runAgent: fakeKimiAgent });
     await (await k3.beginTurn("go", { effort: "high" })).completion;
-    assert.doesNotMatch(
+    assert.match(
       fakeCalls[0].prompt,
-      /\(thinking effort:/,
-      "k3 model: the effort hint is SUPPRESSED (max-only, automatic effort)",
+      /\(reasoning effort: high\)/,
+      "k3 model: the '(reasoning effort: high)' hint IS embedded (k3 accepts low/high/max)",
     );
 
     resetFake(["ok"]);
     const k2 = new KimiSessionDriver({ model: "kimi-k2", systemPrompt: "sys", cwd: process.cwd(), runAgent: fakeKimiAgent });
-    await (await k2.beginTurn("go", { effort: "high" })).completion;
+    await (await k2.beginTurn("go", { effort: "low" })).completion;
     assert.match(
       fakeCalls[0].prompt,
-      /\(thinking effort: high\)/,
-      "non-k3 model: the effort hint is KEPT (same effort, only k3 is suppressed)",
+      /\(reasoning effort: low\)/,
+      "non-k3 model: the '(reasoning effort: low)' hint is embedded too",
     );
   }
 

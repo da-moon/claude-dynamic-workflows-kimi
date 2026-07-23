@@ -5,7 +5,7 @@
 //
 // This is the blog's "sort 1000+ rows without context overflow" pattern: bucket
 // width bounds each agent's input; the lone merge agent is the only one that sees
-// all the (already-ordered) candidates, and under --auto-effort it runs at xhigh.
+// all the (already-ordered) candidates, and under --auto-effort it runs at max.
 //
 //   node runner/bin/run-workflow.js examples/tournament-sort.workflow.js --frontier --auto-effort \
 //     --args '{"criterion":"most likely to be a flaky test","items":["test_a timing out","test_b asserts on Date.now",...]}'

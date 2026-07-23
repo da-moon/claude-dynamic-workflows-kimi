@@ -324,7 +324,7 @@ const exec = promisify(execFile);
   );
 }
 
-// 12) auto-effort: layer width drives thinking effort. Exercises the vm path and
+// 12) auto-effort: layer width drives reasoning effort. Exercises the vm path and
 //     AsyncLocalStorage propagation through parallel()/pipeline() thunks. The
 //     `runAgent` seam echoes the effort the runtime resolved for each agent.
 {
@@ -342,7 +342,7 @@ const exec = promisify(execFile);
   assert.deepEqual(r.wide, Array(8).fill("high"), "width 8 -> high (floor)");
   assert.deepEqual(r.small, ["high", "high", "high"], "width 3 -> high");
   assert.deepEqual(r.seven, Array(7).fill("high"), "width 7 -> high");
-  assert.equal(r.solo, "xhigh", "lone agent (width 1) -> xhigh");
+  assert.equal(r.solo, "max", "lone agent (width 1) -> max");
   assert.deepEqual(r.piped, Array(9).fill("high"), "pipeline width 9 -> high (floor)");
 }
 
@@ -357,15 +357,15 @@ const exec = promisify(execFile);
 
   const r2 = await runWorkflowSource(
     'export const meta = { name: "p2" }; return await agent("x", { effort: "low" });',
-    { autoEffort: true, pinnedEffort: "xhigh", runAgent: echo },
+    { autoEffort: true, pinnedEffort: "max", runAgent: echo },
   );
-  assert.equal(r2, "xhigh", "--pin-effort overrides per-call and auto");
+  assert.equal(r2, "max", "--pin-effort overrides per-call and auto");
 
   const r3 = await runWorkflowSource(
     'export const meta = { name: "p3" }; return await agent("x");',
-    { defaults: { effort: "medium" }, runAgent: echo },
+    { defaults: { effort: "high" }, runAgent: echo },
   );
-  assert.equal(r3, "medium", "without --auto-effort, --effort is the fallback");
+  assert.equal(r3, "high", "without --auto-effort, --effort is the fallback");
 
   const r4 = await runWorkflowSource(
     'export const meta = { name: "p4" }; return await agent("x");',
@@ -376,12 +376,12 @@ const exec = promisify(execFile);
 
 // 14) effortForLayerWidth boundaries (the one tunable knob).
 {
-  assert.equal(effortForLayerWidth(1), "xhigh");
+  assert.equal(effortForLayerWidth(1), "max");
   assert.equal(effortForLayerWidth(2), "high");
   assert.equal(effortForLayerWidth(7), "high");
-  assert.equal(effortForLayerWidth(8), "high", "floor is high, not medium");
+  assert.equal(effortForLayerWidth(8), "high", "floor is high, not low");
   assert.equal(effortForLayerWidth(50), "high", "wide fan-out still floors at high");
-  assert.equal(effortForLayerWidth(0), "xhigh", "degenerate width clamps to xhigh");
+  assert.equal(effortForLayerWidth(0), "max", "degenerate width clamps to max");
 }
 
 // 15) per-agent metrics + phase persisted to the journal. The runAgent seam
@@ -413,7 +413,7 @@ const exec = promisify(execFile);
   assert.equal(lines[0].tokensOut, 8, "output+reasoning persisted");
   assert.equal(lines[0].ms, 42, "wall time persisted");
   assert.equal(lines[0].model, "gpt-5.5", "resolved model persisted");
-  assert.equal(lines[0].effort, "xhigh", "lone agent under --auto-effort -> xhigh");
+  assert.equal(lines[0].effort, "max", "lone agent under --auto-effort -> max");
   await rm(dir, { recursive: true, force: true });
 }
 
@@ -445,7 +445,7 @@ const exec = promisify(execFile);
   );
   assert.equal(recs.length, 3, "all three agents recorded in plan");
   assert.equal(recs[0].phase, "Scan");
-  assert.equal(recs[0].effort, "xhigh", "lone agent -> xhigh");
+  assert.equal(recs[0].effort, "max", "lone agent -> max");
   assert.equal(recs[1].effort, "high", "width-2 fan-out -> high");
   assert.equal(r.n, 0, "schema array skeleton is empty (dynamic widths uncounted)");
   assert.equal(r.w, 2, "parallel still returns an array of skeletons");
@@ -515,7 +515,7 @@ const exec = promisify(execFile);
   assert.equal(ends.length, 3, "one end per agent");
   assert.equal(starts[0].label, "a");
   assert.equal(starts[0].phase, "Scan", "start carries the phase");
-  assert.equal(starts[0].effort, "xhigh", "start carries the resolved effort (lone agent)");
+  assert.equal(starts[0].effort, "max", "start carries the resolved effort (lone agent)");
   assert.equal(ends[0].label, "a");
   assert.equal(ends[0].ms, 10, "end carries per-agent metrics");
   assert.equal(ends[0].tokens, 2);
@@ -817,7 +817,7 @@ function makeFakeSessionFactory() {
   assert.equal(recs.filter((x) => x.kind === "session-start").length, 2, "two planned session starts are counted");
   assert.equal(recs.filter((x) => x.kind === "steer").length, 1, "one planned steer is counted");
   assert.equal(recs[0].phase, "Explore", "a planned session carries the phase");
-  assert.equal(recs[0].effort, "xhigh", "a lone planned session start under --auto-effort -> xhigh");
+  assert.equal(recs[0].effort, "max", "a lone planned session start under --auto-effort -> max");
   assert.equal(r.items, 0, "schema-skeleton arrays are empty in --plan");
   assert.equal(r.winner, "a", "waitAny returns the first planned session");
   assert.equal(r.status, "completed", "planned wait returns a completed skeleton snapshot");

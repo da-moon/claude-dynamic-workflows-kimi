@@ -17,7 +17,6 @@
 // genuinely-missing metric becomes a "lower bound" note rather than a crash.
 
 import { buildRunModel, readEvents, liveState, readRunMeta } from "./runModel.js";
-import { isK3 } from "./modelMap.js";
 
 // ── formatting (matches asciiMap.js / the viewer vocabulary) ─────────────────
 export function fmtTokens(n) {
@@ -251,15 +250,12 @@ export function summarizeRun({ journalPath, scriptPath = null, runDir = null, ti
       warn("single-phase-fanout", `Phase "${biggest.phase}" fans out ${biggest.agents} agents with no further structure — consider staging it (e.g. find → verify) or capping the fan-out.`);
     }
   }
-  // implicit effort makes cost and behavior depend on local config/model defaults
-  // — EXCEPT for k3, which is max-only: its reasoning effort is automatic and there
-  // is no --effort/--auto-effort knob, so the advice is moot when the run resolved
-  // to k3 (pinned model is k3, or every effort-less agent already ran on k3).
-  const effortlessAgents = agents.filter((a) => isDefaultEffort(a.effort));
-  const defaultEffort = effortlessAgents.length;
-  const runIsK3 = isK3(meta?.model) || (defaultEffort > 0 && effortlessAgents.every((a) => isK3(a.model)));
-  if (defaultEffort > 0 && !runIsK3) {
-    const msg = `${defaultEffort} of ${journaled} agents ran with no explicit effort → they inherit the user's Kimi config or the model default. Use --auto-effort or --effort for predictable cost and behavior.`;
+  // implicit effort makes cost and behavior depend on the user's Kimi config or
+  // the model default (max for k3). Kimi's ladder is low | high | max, so a
+  // default-effort run can always be pinned lower for predictable cost.
+  const defaultEffort = agents.filter((a) => isDefaultEffort(a.effort)).length;
+  if (defaultEffort > 0) {
+    const msg = `${defaultEffort} of ${journaled} agents ran with no explicit effort → they inherit the user's Kimi config or the model default (max for k3). Use --auto-effort or --effort {low|high|max} for predictable cost and behavior.`;
     (defaultEffort >= 4 || defaultEffort / journaled >= 0.5) ? warn("default-effort-cost", msg) : info("default-effort-cost", msg);
   }
   // a 'read-only' label without enforcement evidence must not be trusted as

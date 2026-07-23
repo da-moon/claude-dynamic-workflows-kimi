@@ -18,7 +18,7 @@ function makeColors(on) {
   };
   C.effort = (eff, s) => {
     if (!on) return String(s);
-    const c = { xhigh: ANSI.magenta, high: ANSI.blue, medium: ANSI.yellow, low: ANSI.dim, minimal: ANSI.dim, none: ANSI.dim }[eff] || "";
+    const c = { max: ANSI.magenta, high: ANSI.blue, low: ANSI.dim }[eff] || "";
     return c ? c + s + ANSI.reset : String(s);
   };
   return C;

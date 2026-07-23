@@ -50,9 +50,11 @@ function isKimiModel(id) {
 }
 
 // True for the k3 frontier tier: the bare model "k3", or a provider-prefixed
-// id ending in "/k3" / "~k3" (e.g. "kimi-code/k3"). k3 is MAX-ONLY — its
-// reasoning effort is automatic and there is NO headless --effort flag — so
-// callers suppress effort injection and soften effort-tuning advice for it.
+// id ending in "/k3" / "~k3" (e.g. "kimi-code/k3"). Used by pickFrontier to rank
+// k3 as the strongest configured tier. k3 accepts reasoning effort low/high/max
+// (default max) per Moonshot's docs, so the runner injects the effort hint for it
+// like any other model; note the managed kimi-code endpoint advertises
+// supportEfforts:["max"] and may pin k3 to max regardless.
 //
 // It keys purely on the "/k3" / "~k3" / exact-"k3" suffix and is
 // PROVIDER-AGNOSTIC: a foreign "openai/k3" WOULD match, while a raw-API

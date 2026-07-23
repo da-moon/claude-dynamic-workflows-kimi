@@ -172,6 +172,10 @@ header{border-bottom:1px solid var(--border);padding:14px 20px;background:
   border-radius:999px;color:var(--muted);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .pill.ok{color:var(--green);border-color:var(--border2)}
 .pill.run{color:var(--amber);border-color:var(--border2)}
+/* Kimi reasoning-effort tiers (low | high | max) — mirrors the TUI map colors */
+.pill.eff-max{color:var(--purple)}
+.pill.eff-high{color:var(--blue)}
+.pill.eff-low{color:var(--dim)}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
 .dot.amber,.sdot.amber,.msdot.amber{background:var(--amber);box-shadow:0 0 8px var(--amber)}
 @keyframes wfpulse{0%,100%{opacity:1}50%{opacity:.35}}
@@ -729,6 +733,8 @@ const SCORE_KEYS=/^(commercial_appeal|differentiation|feasibility|brand|score|ra
 function badge(text,color){ return h('span',{class:'badge',style:{color:'#06110c',background:color}},text); }
 function sevColor(v){v=String(v).toLowerCase();return v==='high'?'#F87171':v==='medium'?'#FBBF24':v==='low'?'#9aa6b2':'#9aa6b2';}
 function effColor(v){v=String(v).toUpperCase();return v==='S'?'#6EE7B7':v==='M'?'#FBBF24':v==='L'?'#F87171':'#9aa6b2';}
+// Reasoning-effort tier -> pill CSS class (low | high | max; '' for default/unknown).
+function effLevelCls(v){v=String(v||'').toLowerCase();return v==='max'?'eff-max':v==='high'?'eff-high':v==='low'?'eff-low':'';}
 function scoreColor(n){const v=Math.max(1,Math.min(10,Number(n)||0));const hue=Math.round((v-1)/9*125);return 'hsl('+hue+',58%,55%)';}
 
 function swatch(s){
@@ -821,7 +827,7 @@ function pendingResult(a){
   const row=h('div',{class:'metarow'});
   row.append(statusChip(a));
   if(a.model) row.append(h('span',{class:'chip',style:{color:modelColor[a.model],borderColor:modelColor[a.model]+'55'}},a.model));
-  if(a.effort) row.append(h('span',{class:'pill'},'effort · '+a.effort));
+  if(a.effort) row.append(h('span',{class:'pill '+effLevelCls(a.effort)},'effort · '+a.effort));
   row.append(h('span',{class:'pill'},'phase · '+a.phase));
   c.append(row);
   if(a.progress){
@@ -921,7 +927,7 @@ function renderRun(){
   // effort breakdown (mirrors the summarize-run report; surfaces default-effort cost)
   const efforts={}; RUN.agents.forEach(a=>{const e=a.effort||'default';efforts[e]=(efforts[e]||0)+1;});
   const effKeys=Object.keys(efforts);
-  if(effKeys.length&&!(effKeys.length===1&&effKeys[0]==='default'&&!hasMetrics())) addkv('effort',h('div',{class:'chips'},effKeys.map(e=>h('span',{class:'pill'},e+' ×'+efforts[e]))));
+  if(effKeys.length&&!(effKeys.length===1&&effKeys[0]==='default'&&!hasMetrics())) addkv('effort',h('div',{class:'chips'},effKeys.map(e=>h('span',{class:'pill '+effLevelCls(e)},e+' ×'+efforts[e]))));
   meta.append(kv);
   m.append(meta);
   return m;
@@ -959,7 +965,7 @@ function renderPhase(p){
     const top=h('div',{style:{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}});
     top.append(h('span',{class:'label-mono',style:{fontWeight:600}},a.label));
     if(a.model) top.append(h('span',{class:'chip',style:{color:modelColor[a.model],borderColor:modelColor[a.model]+'55'}},a.model));
-    if(a.effort) top.append(h('span',{class:'pill'},'effort '+a.effort));
+    if(a.effort) top.append(h('span',{class:'pill '+effLevelCls(a.effort)},'effort '+a.effort));
     if(a.tokens!=null) top.append(h('span',{class:'pill'},fmtTokens(a.tokens)+' tok'));
     if(a.ms!=null) top.append(h('span',{class:'pill'},fmtMs(a.ms)));
     top.append(statusChip(a));
@@ -979,7 +985,7 @@ function renderAgent(a){
   const chips=h('div',{class:'metarow'});
   chips.append(h('span',{class:'pill'},'phase · '+a.phase));
   if(a.model) chips.append(h('span',{class:'chip',style:{color:modelColor[a.model],borderColor:modelColor[a.model]+'55'}},a.model));
-  if(a.effort) chips.append(h('span',{class:'pill'},'effort · '+a.effort));
+  if(a.effort) chips.append(h('span',{class:'pill '+effLevelCls(a.effort)},'effort · '+a.effort));
   if(a.tokens!=null) chips.append(h('span',{class:'pill'},'tokens · '+fmtTokens(a.tokens)));
   if(a.ms!=null) chips.append(h('span',{class:'pill'},'time · '+fmtMs(a.ms)));
   chips.append(statusChip(a));
@@ -1007,7 +1013,7 @@ function sessionChips(s){
   chips.append(h('span',{class:'wbadge'},'worker ⟳ '+s.turns.length+' turn'+(s.turns.length===1?'':'s')));
   chips.append(h('span',{class:'pill'},'phase · '+s.phase));
   if(s.model) chips.append(h('span',{class:'chip',style:{color:modelColor[s.model],borderColor:modelColor[s.model]+'55'}},s.model));
-  if(s.effort) chips.append(h('span',{class:'pill'},'effort · '+s.effort));
+  if(s.effort) chips.append(h('span',{class:'pill '+effLevelCls(s.effort)},'effort · '+s.effort));
   if(s.tokens) chips.append(h('span',{class:'pill'},fmtTokens(s.tokens)+' tok total'));
   if(s.ms) chips.append(h('span',{class:'pill'},fmtMs(s.ms)+' total'));
   const ra=sessRunningAgent(s);
@@ -1409,7 +1415,7 @@ function buildDrawer(id){
     h('button',{class:'xbtn',id:'drawer-close','aria-label':'Close',onclick:closeDrawer},'✕')));
   const chips=h('div',{class:'metarow',style:{padding:'0 18px 12px'}});
   if(a.model) chips.append(h('span',{class:'chip',style:{color:modelColor[a.model],borderColor:modelColor[a.model]+'55'}},a.model));
-  if(a.effort) chips.append(h('span',{class:'pill'},'effort · '+a.effort));
+  if(a.effort) chips.append(h('span',{class:'pill '+effLevelCls(a.effort)},'effort · '+a.effort));
   if(a.tokens!=null) chips.append(h('span',{class:'pill'},fmtTokens(a.tokens)+' tok'));
   if(a.ms!=null) chips.append(h('span',{class:'pill'},fmtMs(a.ms)));
   chips.append(statusChip(a));

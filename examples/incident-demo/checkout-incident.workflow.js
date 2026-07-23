@@ -9,7 +9,7 @@
 //   • a race of sessionful workers + cancel the losers   (phase Hunt, agent.waitAny)
 //   • steering the winner on warm context  (session.steer — a 2nd turn, no re-read)
 //   • a human() decision gate              (answer it live in the viewer, or default)
-//   • a lone synthesis gate                (phase Fix, xhigh under --auto-effort)
+//   • a lone synthesis gate                (phase Fix, max under --auto-effort)
 //
 // The bundled run under .workflow-journal/ is what `npm run demo` opens. To run it
 // for real:  node runner/bin/run-workflow.js examples/incident-demo/checkout-incident.workflow.js \
@@ -46,7 +46,7 @@ const leads = [
 ];
 // Start the workers inside parallel() so --auto-effort sees the real layer
 // width (3 → `high`, the shape in the bundled journal); a plain loop starts
-// each at width 1 → `xhigh`, so the documented rerun wouldn't reproduce it.
+// each at width 1 → `max`, so the documented rerun wouldn't reproduce it.
 const workers = (
   await parallel(
     leads.map(([label, prompt]) => () =>

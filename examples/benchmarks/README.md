@@ -14,28 +14,30 @@ Two arms answer the **same questions** about the **same corpus**:
 
 ```bash
 node runner/bin/run-workflow.js examples/benchmarks/warm-vs-cold.workflow.js \
-  --pin-model kimi-code/kimi-for-coding --effort medium --sandbox read-only
+  --pin-model kimi-code/kimi-for-coding --sandbox read-only
 node runner/bin/summarize-run.js .          # By-phase + Sessionful workers tables
 ```
 
-> **Note — this measurement predates the k3 tier.** When it was taken, `--frontier`
-> selected `kimi-code/kimi-for-coding` (the strongest model then configured), so the
-> recorded run was `kimi-for-coding` at `--effort medium`. On a current kimi-code
-> install `--frontier` selects the max-only **`kimi-code/k3`**, which has automatic
-> reasoning effort and **ignores `--effort`** — a plain `--frontier --effort medium`
-> run today would measure k3, not the numbers below. To reproduce the recorded run,
-> pin the model as shown above (`--pin-model kimi-code/kimi-for-coding --effort
-> medium`); to benchmark the current frontier instead, use `--frontier` and drop
-> `--effort` (it is a no-op for k3).
+> **Note — this measurement predates the k3 tier and the `low`/`high`/`max`
+> reasoning-effort ladder.** When it was taken, `--frontier` selected
+> `kimi-code/kimi-for-coding` (the strongest model then configured) and the run used a
+> flat `medium` effort — a tier since removed. On a current kimi-code install
+> `--frontier` selects **`kimi-code/k3`**, whose reasoning effort is `low`/`high`/`max`
+> (default `max`; the managed kimi-code endpoint pins it to `max`). `kimi-for-coding` is
+> always-thinking and takes no reasoning-effort level, so the original `--effort` was
+> only a prompt hint. To reproduce the recorded run, pin the model as shown above
+> (`--pin-model kimi-code/kimi-for-coding`); to benchmark the current frontier instead,
+> use `--frontier` (k3, at its default `max`).
 
-### Measured result (2026-07-15 · kimi-code 0.23.3 · kimi-code/kimi-for-coding · effort medium · corpus `runner/src`, ~4.1k lines · 3 questions)
+### Measured result (2026-07-15 · kimi-code 0.23.3 · kimi-code/kimi-for-coding · legacy `medium` effort · corpus `runner/src`, ~4.1k lines · 3 questions)
 
 > Measured on the real Kimi backend, post-port (the runner rides `kimi -S`
 > persisted sessions; the seam file is `kimiAgent.js`). The original run used
-> `--frontier --effort medium`, which on kimi-code 0.23.3 selected
-> `kimi-code/kimi-for-coding` (this predates the k3 tier); to reproduce it now,
-> pin that model: `--pin-model kimi-code/kimi-for-coding --effort medium
-> --sandbox read-only --budget 4000000 --run-id bench1`. Completed in 1m32s
+> `--frontier` with a flat `medium` effort (a tier since removed), which on
+> kimi-code 0.23.3 selected `kimi-code/kimi-for-coding` (this predates the k3 tier);
+> to reproduce it now, pin that model: `--pin-model kimi-code/kimi-for-coding
+> --sandbox read-only --budget 4000000 --run-id bench1` (`kimi-for-coding` is
+> always-thinking, so no `--effort` level applies). Completed in 1m32s
 > wall-clock, 7/7 agents completed, 0 retries.
 
 | | tokens (est.) | agent time |

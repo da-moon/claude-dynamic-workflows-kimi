@@ -105,7 +105,7 @@ const cases = [
     J({ key: "e2#0", label: "scan:routes", result: { findings: [] },
       phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 308000, tokensOut: 61000, ms: 4100 }),
     J({ key: "e3#0", label: "consolidate", result: { summary: "one real issue" },
-      phase: "Report", model: "gpt-5.5", effort: "xhigh", tokens: 980000, tokensOut: 210000, ms: 21000 }) ] },
+      phase: "Report", model: "gpt-5.5", effort: "max", tokens: 980000, tokensOut: 210000, ms: 21000 }) ] },
   // Persisted workflow result (the *.result.json sidecar): the viewer should show
   // the honest return value (result node → result drawer, Run overview inline).
   { name: "with-result",
@@ -124,7 +124,7 @@ const cases = [
     J({ key: "sess:s1#0", label: "oracle", result: { summary: "Repo ingested." }, phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 52000, ms: 86000, session: true, sessionId: "s1", turn: 0, status: "completed", threadId: "th-1" }),
     J({ key: "sess:s1#1", label: "oracle", result: { summary: "Auth flows traced." }, phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 30000, ms: 40000, session: true, sessionId: "s1", turn: 1, status: "completed", threadId: "th-1" }),
     J({ key: "sess:s2#0", label: "rival", result: null, phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 12000, ms: 20000, session: true, sessionId: "s2", turn: 0, status: "cancelled", threadId: "th-2" }),
-    J({ key: "j#0", label: "judge:final", result: { one_line_verdict: "Oracle wins." }, phase: "Judge", model: "gpt-5.5", effort: "xhigh", tokens: 90000, ms: 60000 }) ],
+    J({ key: "j#0", label: "judge:final", result: { one_line_verdict: "Oracle wins." }, phase: "Judge", model: "gpt-5.5", effort: "max", tokens: 90000, ms: 60000 }) ],
     events: [
       J({ t: 1000, type: "start", id: "sess:s1#2", label: "oracle", phase: "Explore", model: "gpt-5.5", effort: "high", kind: "session", sessionId: "s1", turn: 2 }),
     ],

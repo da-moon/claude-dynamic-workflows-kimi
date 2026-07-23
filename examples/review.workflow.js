@@ -4,7 +4,7 @@
 //
 //   node .../bin/run-workflow.js review.workflow.js \
 //     --args '{"files":["src/auth.ts","src/routes.ts"],"focus":"missing authorization checks"}' \
-//     --frontier --effort medium --sandbox read-only --budget 400000
+//     --frontier --effort low --sandbox read-only --budget 400000
 //
 // Pattern: pipeline(files, scan→schema, verify→parallel). Agents do the file
 // reading (the script itself is sandboxed); findings that ≥1 skeptic confirms

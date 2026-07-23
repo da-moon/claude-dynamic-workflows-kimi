@@ -13,7 +13,7 @@
 // The workflow also returns the warm worker's per-turn numbers directly.
 //
 //   node runner/bin/run-workflow.js examples/benchmarks/warm-vs-cold.workflow.js \
-//     --frontier --effort medium --sandbox read-only \
+//     --frontier --sandbox read-only \
 //     --args '{"scope":"runner/src","questions":["…","…","…"]}'
 //
 // Runs under --plan (no Kimi, no tokens): counts 1 ingest + N steers + N cold agents.

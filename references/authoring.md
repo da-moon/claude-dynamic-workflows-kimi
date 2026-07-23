@@ -71,7 +71,7 @@ a fresh `kimi -p <prompt> --output-format stream-json` subprocess per call.
 | `model` | **Leave unset in scripts.** Runs are pinned to the strongest *configured* model with `--frontier`, which overrides any per-call `model` anyway. (If you do set it: usable ids are the ones configured in kimi — `kimi provider list --json`, e.g. `kimi-code/k3` — and Claude ids/aliases map `opus` → `k3` (`kimi-code/k3`), `sonnet`/`haiku` → `kimi-for-coding-highspeed`; an unconfigured id falls back to kimi's own config default with a warning.) |
 | `agentType` | name of a subagent in `.claude/agents/<name>.md`; its body becomes the system prompt, its frontmatter `model` a fallback |
 | `systemPrompt` | explicit developer instructions (overrides `agentType` body) |
-| `effort` | `none`/`minimal`/`low`/`medium`/`high`/`xhigh`. **Usually leave unset and run with `--auto-effort`**, which scales effort to each layer's parallel width (1→`xhigh`, 2+→`high` — the floor) so lone gate agents get the policy's extra-high tier while every fan-out still gets `high`. A per-call `effort` *overrides* the policy, so set it only as a deliberate exception. Precedence: `--pin-effort` > per-call `effort` > `--auto-effort` > `--effort` > unset (no effort hint at all). Effort reaches Kimi as a **prompt hint** (`(thinking effort: X)` prepended to the turn), not an API parameter — a strong steer, not a hard guarantee. |
+| `effort` | `low`/`high`/`max` (Kimi's reasoning-effort ladder — Moonshot's `reasoning_effort`; default `max`). **Usually leave unset and run with `--auto-effort`**, which scales effort to each layer's parallel width (1→`max`, 2+→`high` — the floor) so lone gate agents get the policy's top tier while every fan-out still gets `high`. A per-call `effort` *overrides* the policy, so set it only as a deliberate exception. Precedence: `--pin-effort` > per-call `effort` > `--auto-effort` > `--effort` > unset (no effort hint at all). Effort reaches Kimi as a **prompt hint** (`(reasoning effort: X)` prepended to the turn), not an API parameter — a strong steer, not a hard guarantee. |
 | `sandbox` | `read-only` \| `workspace-write` \| `danger-full-access`. **`read-only` is ENFORCED (best-effort):** the agent's cwd moves into a disposable detached git worktree at HEAD (stray writes are contained and **discarded**, touched paths logged) and a hard read-only preamble tops its prompt; if that isolation is unavailable (cwd not a git repo) the call is **refused before any spawn** — never downgraded to a label. Limits: containment, not a security boundary (absolute paths / shell side effects / network can still escape), and reads see HEAD — not uncommitted changes. `workspace-write` / `danger-full-access` stay **advisory labels**: behavior is the default full-auto (every tool action auto-approved). All values are journaled (cache identity) with a per-agent `sandboxEnforced` fact and reported in summaries. Omit the opt for the default: unrestricted full-auto |
 | `isolation` | `'worktree'` → run in a detached git worktree at HEAD (parallel file-editing agents don't collide); kept if it leaves changes |
 | `cwd` | working directory for the thread (default the runner's cwd) |
@@ -141,7 +141,7 @@ for the turn to finish**. Same `opts` as `agent()` (`agentType`, `systemPrompt`,
 `model`, `effort`, `sandbox`, `cwd`, `personality`, `schema`, `timeoutMs`, `phase`,
 `label`, `isolation:'worktree'`). Effort resolves exactly like `agent()` (so under
 `--auto-effort` a worker in a `parallel([…])` fan-out gets `high`, a lone start gets
-`xhigh`). Holds a concurrency slot for the running turn — **a detached running
+`max`). Holds a concurrency slot for the running turn — **a detached running
 worker counts against the cap** until its turn settles.
 
 ### `agent.waitAny(sessions, opts?) → Promise<{ session, index, snapshot, pendingSessions, timedOut }>`
@@ -429,7 +429,7 @@ web search if your Kimi has web tools).
   strongest configured model (here `kimi-code/k3`) and **overrides any per-call
   `model`** — so leave `model` out of `agent()` opts. This is a deliberate divergence from the native
   blog's "classify-and-route to Sonnet vs Opus": instead of *model* routing for
-  cost, this re-host keeps one model and uses **thinking effort** as the dial
+  cost, this re-host keeps one model and uses **reasoning effort** as the dial
   (`--auto-effort` scales it to layer width; `--effort`/`--pin-effort`/`--budget`
   bound it). Mixing models or downgrading "cheap" stages is what produces
   inconsistent multi-model runs — don't.
@@ -446,10 +446,10 @@ web search if your Kimi has web tools).
 - **Effort scales to layer width — let `--auto-effort` set it.** Don't hand-set
   `effort` per agent. Run with `--auto-effort` and the runner reads each layer's
   fan-out width (thunks in a `parallel()`, items in a `pipeline()` stage) and
-  picks effort: **1→`xhigh`** (a lone agent is a critical gate — consolidate,
-  judge, synthesize, report — so it gets the policy's extra-high tier) and
+  picks effort: **1→`max`** (a lone agent is a critical gate — consolidate,
+  judge, synthesize, report — so it gets the policy's top tier) and
   **2+→`high`** (the floor — every fan-out still thinks hard; the policy never
-  drops to `medium`).
+  drops to `low`).
   This means you express importance *structurally* — a synthesis you want done
   well should be its own single-agent step, not buried inside a fan-out. Reserve
   a per-call `effort` (which overrides the policy) for a rare exception.

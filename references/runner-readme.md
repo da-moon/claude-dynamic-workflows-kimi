@@ -43,7 +43,7 @@ workflow script (.js, unchanged)
 | `session.cancel()`            | per-turn `AbortSignal` → **SIGTERM** the live `kimi` subprocess → turn resolves `interrupted`, snapshot `cancelled` |
 | `agentType: 'x'`              | loads `.claude/agents/x.md` → its body becomes the system prompt (prepended to the prompt) |
 | `model` (Claude id or alias)  | remapped onto the **configured** model set (`kimi provider list --json`) |
-| `systemPrompt` / `effort`     | prepended to the prompt (effort as a `(thinking effort: X)` hint — a steer, not an API parameter) |
+| `systemPrompt` / `effort`     | prepended to the prompt (effort as a `(reasoning effort: X)` hint — a steer, not an API parameter) |
 | sandbox / permissions         | headless `kimi -p` is full-auto (every tool action auto-approved) — the runner's first-class default. `sandbox:'read-only'` is **enforced runner-side** (worktree-isolated cwd + hard preamble; refused fast when unavailable); `workspace-write`/`danger-full-access` stay advisory labels (see below) |
 | transient errors              | retry with exponential backoff (default 3); permanent config errors fail fast |
 | `budget.spent()`              | summed per-turn **estimates** (~4 chars/token over prompt + final text; the CLI reports no usage) |
@@ -73,7 +73,7 @@ kimi [-S <session_id>] -p <full prompt> --output-format stream-json [--model <co
 - The **full prompt** is assembled by the runner: for an enforced `read-only`
   turn the hard sandbox preamble (first, above everything), then the system
   prompt (from `systemPrompt` or the `agentType` file), an optional
-  `(thinking effort: X)` hint, the prompt itself, and — with a `schema` — the
+  `(reasoning effort: X)` hint, the prompt itself, and — with a `schema` — the
   strict-normalized schema plus a "respond with a single JSON object"
   instruction.
 
@@ -227,8 +227,8 @@ run-workflow <script.js>
   --model M           fallback model (Claude ids/aliases auto-mapped); omit for config default
   --frontier          pin ALL agents to the strongest CONFIGURED model
   --pin-model M       pin ALL agents to model M (validated; fails fast if unusable)
-  --effort E          none|minimal|low|medium|high|xhigh (flat fallback, prompt hint)
-  --auto-effort       scale effort to each layer's parallel width: 1->xhigh, 2+->high (floor)
+  --effort E          low|high|max (flat fallback, prompt hint; default max)
+  --auto-effort       scale effort to each layer's parallel width: 1->max, 2+->high (floor)
   --pin-effort E      force ALL agents to effort E (overrides per-call effort)
   --sandbox S         read-only → ENFORCED best-effort (disposable worktree cwd +
                       hard preamble; refused fast when isolation is unavailable);
@@ -281,17 +281,17 @@ maps width → effort with `effortForLayerWidth`:
 
 | layer width | effort  |
 | ----------- | ------- |
-| 1           | `xhigh` |
+| 1           | `max`   |
 | 2+          | `high`  |
 
 The rationale: a lone agent is a critical gate (consolidation / judge / report)
-where one weak output sinks the run, so it gets the policy's extra-high tier;
-every fan-out floors at `high` (the policy never drops to `medium`). The context
+where one weak output sinks the run, so it gets the policy's top tier;
+every fan-out floors at `high` (the policy never drops to `low`). The context
 propagates across awaits and through the vm-hosted thunks, so a queued or
 deeply-awaited agent still sees the width of the layer that spawned it. Effort
 precedence (highest first): `--pin-effort` → per-call `opts.effort` →
 `--auto-effort` → `--effort` → unset (no effort hint sent; kimi's own defaults
-apply). Effort reaches the model as a `(thinking effort: X)` prompt hint, and
+apply). Effort reaches the model as a `(reasoning effort: X)` prompt hint, and
 the *effective* effort is folded into each agent's journal identity, so toggling
 the policy between runs busts only the agents whose effort changed.
 

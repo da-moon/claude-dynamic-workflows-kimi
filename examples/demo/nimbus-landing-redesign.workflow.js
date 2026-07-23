@@ -123,7 +123,7 @@ const synthPrompt = (audit, concepts, judges) => `${BRIEF}\n\nYou are the lead d
 /* ── orchestration (barrier-structured) ──────────────────────────────────── */
 phase("Audit");
 const audits = (await parallel(LENSES.map((l) => () =>
-  agent(auditPrompt(l), { schema: AUDIT_SCHEMA, label: `audit:${l.key}`, phase: "Audit", effort: "medium" })))).filter(Boolean);
+  agent(auditPrompt(l), { schema: AUDIT_SCHEMA, label: `audit:${l.key}`, phase: "Audit", effort: "high" })))).filter(Boolean);
 const auditDigest = JSON.stringify(audits, null, 2);
 log(`Audit complete — ${audits.length}/${LENSES.length} lenses`);
 
@@ -135,7 +135,7 @@ log(`Concepts generated — ${concepts.length}/${DIRECTIONS.length} directions`)
 
 phase("Judge");
 const judges = (await parallel(JUDGES.map((j) => () =>
-  agent(judgePrompt(j, conceptsDigest, auditDigest), { schema: RANKING_SCHEMA, label: `judge:${j.key}`, phase: "Judge", effort: "medium" })))).filter(Boolean);
+  agent(judgePrompt(j, conceptsDigest, auditDigest), { schema: RANKING_SCHEMA, label: `judge:${j.key}`, phase: "Judge", effort: "high" })))).filter(Boolean);
 const judgesDigest = JSON.stringify(judges, null, 2);
 log(`Judging complete — ${judges.length}/${JUDGES.length} panels`);
 

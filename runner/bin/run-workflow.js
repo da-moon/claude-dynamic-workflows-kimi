@@ -2,7 +2,7 @@
 // CLI entrypoint: run a persisted dynamic-workflow script against Kimi CLI.
 //
 //   run-workflow <script.js> [--args JSON] [--args-file path]
-//                [--budget N] [--model M] [--effort low|medium|high|...]
+//                [--budget N] [--model M] [--effort low|high|max]
 //                [--sandbox read-only|workspace-write|danger-full-access]
 //
 // Progress is written to stderr; the workflow's return value is printed as JSON
@@ -100,7 +100,7 @@ if (opts.help || !opts.script) {
   console.error(
     "usage: run-workflow <script.js> [--args JSON] [--args-file path]\n" +
       "  [--budget N] [--budget-meter total|output] [--model M] [--frontier | --pin-model M]\n" +
-      "  [--effort none|minimal|low|medium|high|xhigh] [--auto-effort | --pin-effort E]\n" +
+      "  [--effort low|high|max] [--auto-effort | --pin-effort E]\n" +
       "  [--sandbox read-only|workspace-write|danger-full-access] [--retries N]\n" +
       "  [--plan] [--tui] [--gui] [--resume] [--journal PATH] [--run-id NAME] [--fresh] [--no-journal]\n" +
       "  [--summary | --no-summary]\n" +
@@ -123,8 +123,8 @@ if (opts.help || !opts.script) {
       "                   per-call model in the script\n" +
       "  --pin-model M    pin ALL agents to model M (validated against the configured\n" +
       "                   set; fails fast if M is not usable), overriding any per-call model\n" +
-      "  --auto-effort    scale thinking effort to each layer's parallel width:\n" +
-      "                   1 agent->xhigh, 2+ agents->high (floor). Critical single-agent\n" +
+      "  --auto-effort    scale reasoning effort to each layer's parallel width:\n" +
+      "                   1 agent->max, 2+ agents->high (floor). Critical single-agent\n" +
       "                   gates (consolidate/judge/report) get the highest auto-policy tier.\n" +
       "                   Overridden by a per-call effort; overrides --effort.\n" +
       "  --pin-effort E   force ALL agents to effort E, overriding per-call effort\n" +
@@ -145,12 +145,14 @@ if (opts.help || !opts.script) {
 
 // Rough per-agent token estimates by effort, for --plan budget sizing. Frontier
 // reasoning models, all-in (input+output+reasoning). Deliberately conservative.
+// Kimi reasoning effort is low | high | max (default max) — see Moonshot's
+// Reasoning Effort docs; there is no medium/xhigh tier.
 const EST_TOKENS_PER_EFFORT = {
-  none: 80_000, minimal: 80_000, low: 150_000, medium: 350_000, high: 550_000, xhigh: 800_000,
+  low: 150_000, high: 550_000, max: 800_000,
 };
-// An effort-less agent inherits the user's Kimi config or the model default.
-// Cost that unknown at xhigh so the estimate remains conservative.
-const PLAN_DEFAULT_EFFORT = "xhigh";
+// An effort-less agent inherits the user's Kimi config or the model default
+// (max for k3). Cost that unknown at max so the estimate remains conservative.
+const PLAN_DEFAULT_EFFORT = "max";
 
 function printPlan(recs) {
   const byPhase = new Map();
@@ -178,8 +180,8 @@ function printPlan(recs) {
   console.error(`  total agents: ${recs.length}`);
   console.error(
     `  estimated tokens: ~${fmtM(estTotal)}  ` +
-      `(rough: low ${EST_TOKENS_PER_EFFORT.low / 1000}k / med ${EST_TOKENS_PER_EFFORT.medium / 1000}k / ` +
-      `high ${EST_TOKENS_PER_EFFORT.high / 1000}k / xhigh ${EST_TOKENS_PER_EFFORT.xhigh / 1000}k per agent)`,
+      `(rough: low ${EST_TOKENS_PER_EFFORT.low / 1000}k / ` +
+      `high ${EST_TOKENS_PER_EFFORT.high / 1000}k / max ${EST_TOKENS_PER_EFFORT.max / 1000}k per agent)`,
   );
   console.error(`  suggested --budget ${suggested}  (estimate ×1.3 headroom)`);
   if (sawDefault) console.error(`  note: 'default' (no effort set) conservatively costed at ${PLAN_DEFAULT_EFFORT}; actual user-config/model default may differ.`);
@@ -234,7 +236,7 @@ if (opts.retries != null && !Number.isNaN(opts.retries)) defaults.retries = opts
 // Thinking-effort policy. `--pin-effort` (authoritative) and `--auto-effort`
 // (layer-width policy) are plumbed into the runtime; `--effort` stays a flat
 // fallback. Validate effort spellings up front so a typo fails fast.
-const EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh"]);
+const EFFORTS = new Set(["low", "high", "max"]);
 for (const [flag, val] of [["--effort", opts.effort], ["--pin-effort", opts.pinEffort]]) {
   if (val && !EFFORTS.has(val)) {
     console.error(`${flag}: unknown effort '${val}' (expected ${[...EFFORTS].join("|")})`);
@@ -244,7 +246,7 @@ for (const [flag, val] of [["--effort", opts.effort], ["--pin-effort", opts.pinE
 const pinnedEffort = opts.pinEffort ?? null;
 if (pinnedEffort) console.error(`⊙ pinning all agents to effort: ${pinnedEffort}`);
 else if (opts.autoEffort) {
-  console.error("⊙ auto-effort: scaling by layer width (1→xhigh, 2+→high)");
+  console.error("⊙ auto-effort: scaling by layer width (1→max, 2+→high)");
   if (opts.effort) console.error("  note: --auto-effort governs effort; --effort is ignored");
 }
 
@@ -530,8 +532,18 @@ if ((opts.tui || opts.gui) && journalPath) {
   if (opts.gui) {
     // --serve: the live viewer is served over localhost (not file://), so its
     // human() answer card can POST back — the interactive cockpit channel.
-    guiChild = spawn("node", [join(BIN_DIR, "view-run.js"), "--journal", abs, "--watch", "--serve", "--open"], { stdio: "ignore" });
+    // Pipe the child's stderr (stdout stays quiet) so we can surface the
+    // localhost URL it binds to: view-run picks an ephemeral free port, and
+    // without relaying it the user never learns which port the GUI is on.
+    guiChild = spawn("node", [join(BIN_DIR, "view-run.js"), "--journal", abs, "--watch", "--serve", "--open"], { stdio: ["ignore", "ignore", "pipe"] });
     console.error("🖥  GUI monitor: live HTML viewer opening in your browser…");
+    let guiUrlAnnounced = false;
+    guiChild.stderr?.setEncoding("utf8");
+    guiChild.stderr?.on("data", (chunk) => {
+      if (guiUrlAnnounced) return; // keep draining the pipe, but announce the URL only once
+      const m = String(chunk).match(/https?:\/\/127\.0\.0\.1:\d+\/\S+/);
+      if (m) { guiUrlAnnounced = true; console.error(`🖥  GUI viewer on ${m[0]}  (answers enabled)`); }
+    });
   }
   if (opts.tui) openTuiWindow(abs);
 } else if ((opts.tui || opts.gui) && !journalPath) {

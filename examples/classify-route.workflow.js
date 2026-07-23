@@ -3,9 +3,9 @@
 // pattern — but note the deliberate divergence from the native example:
 //
 //   Native routes cheap stages to a smaller model (Sonnet vs Opus). This re-host
-//   keeps ONE frontier model for every agent and lets *thinking effort* be the
+//   keeps ONE frontier model for every agent and lets *reasoning effort* be the
 //   lever instead: under --auto-effort the lone classifier and the lone handler
-//   both run at xhigh, and you bound cost with --effort / --budget, not by
+//   both run at max, and you bound cost with --effort / --budget, not by
 //   downgrading the model. (See references/authoring.md → "one model, effort is
 //   the lever".)
 //
@@ -48,7 +48,7 @@ const cls = (await agent(
 )) || { category: "explain", complexity: "medium", rationale: "classifier unavailable — default route" };
 
 // Branch: each specialist gets a prompt tuned to its job. Same model for all;
-// effort is governed by --auto-effort (a lone handler is a critical gate → xhigh).
+// effort is governed by --auto-effort (a lone handler is a critical gate → max).
 const HANDLERS = {
   explain: `Explain, with file:line citations from ${DIR}, how this works: ${TASK}. Be concrete and structured.`,
   fix: `Investigate and propose a concrete fix (diff-level steps, files to touch) for: ${TASK}. Read ${DIR} as needed.`,

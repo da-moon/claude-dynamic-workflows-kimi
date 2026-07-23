@@ -10,7 +10,7 @@
 
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
-import { resolveModel, isK3 } from "./modelMap.js";
+import { resolveModel } from "./modelMap.js";
 import { loadAgentType } from "./agentTypes.js";
 import { estimateTokens, recordTokenUsage } from "./meter.js";
 
@@ -263,7 +263,7 @@ async function runOneTurn(prompt, opts) {
   }
   const model = resolveModel(requestedModel, availableModels, log);
 
-  const fullPrompt = buildFullPrompt(prompt, { systemPrompt, schema, effort, readOnly: opts.sandboxEnforced, model });
+  const fullPrompt = buildFullPrompt(prompt, { systemPrompt, schema, effort, readOnly: opts.sandboxEnforced });
 
   // `resumeSessionId` re-attaches to a persisted Kimi session (-S) so a follow-up
   // turn runs with the session's full context (tool calls included) instead of a
@@ -319,13 +319,16 @@ async function runOneTurn(prompt, opts) {
   return parseSchemaResult(text, schema);
 }
 
-function buildFullPrompt(prompt, { systemPrompt, schema, effort, readOnly, model }) {
+function buildFullPrompt(prompt, { systemPrompt, schema, effort, readOnly }) {
   let parts = [];
   if (readOnly) parts.push(READ_ONLY_PREAMBLE); // first — above even the system prompt
   if (systemPrompt) parts.push(systemPrompt);
-  // k3 is max-only: its reasoning effort is automatic and a lower "(thinking
-  // effort: X)" hint would be ignored (or mislead), so suppress the injection.
-  if (effort && !isK3(model)) parts.push(`(thinking effort: ${effort})`);
+  // Convey the requested reasoning effort as a natural-language hint — the Kimi
+  // CLI has no headless reasoning-effort flag. Kimi models accept low | high |
+  // max (default max; see Moonshot's Reasoning Effort docs). NOTE: the managed
+  // kimi-code endpoint may pin k3 to max regardless (its provider advertises
+  // supportEfforts:["max"]), so on that backend a sub-max hint is best-effort.
+  if (effort) parts.push(`(reasoning effort: ${effort})`);
   parts.push(typeof prompt === "string" ? prompt : JSON.stringify(prompt));
   if (schema) {
     parts.push(

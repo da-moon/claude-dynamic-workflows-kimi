@@ -122,7 +122,7 @@ node runner/bin/run-workflow.js examples/harness-zoo/claim-check/claim-check.wor
 
 ClaimCheck is a `2 + N`-agent **standard** harness, so it runs with
 **`--auto-effort`**: the N parallel verifiers get `high`, while the lone gates —
-Extract and the Ledger synthesis — get `xhigh`, since a weak output at either
+Extract and the Ledger synthesis — get `max`, since a weak output at either
 single-agent gate would sink the whole audit. Keep it **`--sandbox read-only`** so the
 skeptics read the repo but never edit it.
 

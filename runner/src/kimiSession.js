@@ -16,7 +16,7 @@
 
 import { setTimeout as sleep } from "node:timers/promises";
 import { kimiAgent, parseSchemaResult, strictifySchema, assertSandboxValue, READ_ONLY_PREAMBLE } from "./kimiAgent.js";
-import { resolveModel, isK3 } from "./modelMap.js";
+import { resolveModel } from "./modelMap.js";
 import { loadAgentType } from "./agentTypes.js";
 import { estimateTokens } from "./meter.js";
 
@@ -272,9 +272,10 @@ export class KimiSessionDriver {
         parts.push("Now respond to the next turn.");
       }
     }
-    // k3 is max-only (automatic reasoning effort, no --effort knob): suppress the
-    // "(thinking effort: X)" hint for it, exactly as kimiAgent.buildFullPrompt does.
-    if (effort && !isK3(this.model)) parts.push(`(thinking effort: ${effort})`);
+    // Convey the requested reasoning effort as a natural-language hint (Kimi's
+    // ladder is low | high | max; the CLI has no headless effort flag), applied
+    // uniformly across models, exactly as kimiAgent.buildFullPrompt does.
+    if (effort) parts.push(`(reasoning effort: ${effort})`);
     parts.push(typeof prompt === "string" ? prompt : JSON.stringify(prompt));
     if (schema) {
       // Same strict normalization as one-shot agent() turns (kimiAgent.buildFullPrompt),

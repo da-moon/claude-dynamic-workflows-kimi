@@ -65,7 +65,7 @@ Every run, in order (the sections below expand each step):
 2. **Compile** the rough intent: classify the job → scale → archetype → pattern
    (name the failure mode it prevents) → task contract. **State your assumptions.**
 3. **Author** the script into the repo (`./<name>.workflow.js`).
-4. **Settings:** `--frontier` · effort by scale (`--effort medium` for a
+4. **Settings:** `--frontier` · effort by scale (`--effort low` for a
    `quick_harness`, `--auto-effort` for `standard`/`deep`) · a bounded `--budget`
    · strict schemas (`additionalProperties:false`). Runs are **full-auto** by
    default; `--sandbox read-only` opts audit/research runs into enforced
@@ -131,7 +131,7 @@ are unchanged; steps 2 and 4 are where rough intent gets compiled.
    harness. Scripts are plain JavaScript using only the injected globals (no imports).
 
 4. **Choose run settings** (see *Run defaults*): `--frontier`, the effort flag for
-   the chosen scale (`--auto-effort` for a standard/deep harness, `--effort medium`
+   the chosen scale (`--auto-effort` for a standard/deep harness, `--effort low`
    for a quick one), and a bounded `--budget`. Runs execute **full-auto** by
    default; add `--sandbox read-only` for audits/research — it is enforced
    (worktree-isolated cwds + a hard preamble; needs a git repo) (see *Run
@@ -142,11 +142,11 @@ are unchanged; steps 2 and 4 are where rough intent gets compiled.
 5. **Run** it — **always pass `--frontier`**, plus the effort flag for the chosen
    scale: `--auto-effort` for a standard/deep harness (it scales each agent's effort
    to its layer's parallel width, so lone synthesis/judge gates think hardest), or
-   `--effort medium` for a quick harness (see *Effort*). `--frontier` pins every
+   `--effort low` for a quick harness (see *Effort*). `--frontier` pins every
    agent to the strongest configured model (see *Model*):
    ```bash
    node "${CLAUDE_SKILL_DIR}/runner/bin/run-workflow.js" <script.js> --frontier --auto-effort [other flags]
-   #   quick_harness:  … <script.js> --frontier --effort medium [other flags]
+   #   quick_harness:  … <script.js> --frontier --effort low [other flags]
    ```
    Progress streams on **stderr**; the workflow's return value prints as JSON on
    **stdout**. Capture stdout for the result (`… 1>/tmp/result.json`) when it's
@@ -212,10 +212,10 @@ agent whose job is *reading a repo/corpus* costs **~400–600k tokens
 regardless of its effort tier** — the input dominates, so `--effort low`
 does not make a sweep cheap, and `--plan`'s per-effort estimate undercounts
 it (measured: four "low" sweeps = 2.1M, 525k each, vs a 150k/agent plan
-estimate). At `xhigh` — which `--auto-effort` gives every sessionful worker's
+estimate). At `max` — which `--auto-effort` gives every sessionful worker's
 turns (width 1) — a reading turn runs **~1–1.5M** (measured: a walkthrough
 worker's first turn + one steer tripped a 2.5M ceiling). Budget ≈
-`readers × 500k + xhigh reading turns × 1.2M + non-readers × the plan
+`readers × 500k + max reading turns × 1.2M + non-readers × the plan
 estimate`, with headroom. A tripped ceiling is recoverable (`--resume` replays the
 prefix free) but costs a supervision round-trip. Apply the *Anti-overbuild
 rule* to the fleet too: 2 well-differentiated variants beat 4 redundant ones
@@ -314,10 +314,10 @@ productization · goal hardening · run summarization · harness design.**
 **Rule: choose the smallest harness that can reliably solve the task** (see the
 *Anti-overbuild rule*).
 
-**Effort by scale:** a `quick_harness` runs at a flat **`--effort medium`** (or
-`--pin-effort medium`) — a small analytical run doesn't need layer-scaled effort.
+**Effort by scale:** a `quick_harness` runs at a flat **`--effort low`** (or
+`--pin-effort low`) — a small analytical run doesn't need layer-scaled effort.
 `standard_harness` and `deep_harness` run at **`--auto-effort`** (lone gates get
-`xhigh`, fan-outs floor at `high`). See *Run defaults* and *Effort*.
+`max`, fan-outs floor at `high`). See *Run defaults* and *Effort*.
 
 ### 3 · Pick the archetype
 
@@ -510,8 +510,8 @@ this section is the policy, not the reference):
 | Always | the Kimi runner, **not** the native `Workflow` tool | routes work to Kimi agents, not Claude subagents |
 | Always | write the script into the repo | reproducible and rereadable |
 | Model | `--frontier` | one frontier model for every agent (see *Model*) |
-| Effort — `quick_harness` | `--effort medium` (or `--pin-effort medium`) | a small analytical run doesn't need layer-scaled effort; a flat, cheaper tier suffices |
-| Effort — `standard` / `deep` | `--auto-effort` | scales effort to layer width; lone synthesis/judge gates get `xhigh`, fan-outs floor at `high` |
+| Effort — `quick_harness` | `--effort low` (or `--pin-effort low`) | a small analytical run doesn't need layer-scaled effort; a flat, cheaper tier suffices |
+| Effort — `standard` / `deep` | `--auto-effort` | scales effort to layer width; lone synthesis/judge gates get `max`, fan-outs floor at `high` |
 | Permissions | **full-auto (unrestricted)** — the default; no flag needed | headless `kimi -p` auto-approves every tool action; with no sandbox value the runner adds no gate (see *Sandbox & permissions* below) |
 | Read-only runs | `--sandbox read-only` (audits/research) | **enforced, best-effort** — worktree-isolated cwd per agent (stray writes discarded) + hard read-only preamble; refused fast outside a git repo. Not a security boundary (absolute paths/shell/network can escape) |
 | Intent label | `--sandbox workspace-write` (runs meant to write) | **advisory metadata only** — journaled (cache identity) and reported as advisory; behavior identical to full-auto |
@@ -587,45 +587,49 @@ uses its own configured default.
 
 Need to bound cost? Lower effort (see below) and set `--budget` — do not switch models.
 
-## Effort: scale thinking to layer width
+## Effort: scale reasoning to layer width
 
-Thinking effort is the second dial (after model). The principle: **the fewer
-agents run in parallel at a step, the more pivotal each one is, so the harder it
-should think.** A lone agent in its layer is almost always a critical *gate* — a
-consolidation, a judge/synthesis, a final report — where one weak output sinks the
-whole run; it earns the auto-policy's extra-high `xhigh` tier. A 12-wide persona
-fan-out is the opposite:
+Reasoning effort is the second dial (after model). Kimi's reasoning-effort ladder is
+**`low` · `high` · `max`** (default `max`) — matching Moonshot's top-level
+`reasoning_effort` field for the K3 thinking model; there is no `medium`/`xhigh`
+tier. The principle: **the fewer agents run in parallel at a step, the more pivotal
+each one is, so the harder it should think.** A lone agent in its layer is almost
+always a critical *gate* — a consolidation, a judge/synthesis, a final report —
+where one weak output sinks the whole run; it earns the auto-policy's top `max`
+tier. A 12-wide persona fan-out is the opposite:
 each agent is one voice among many, and redundancy covers individual misses.
 
 **For a standard or deep harness, pass `--auto-effort`** (a small `quick_harness`
-runs at a flat `--effort medium` instead — see *Harness scale selector*). The runner
+runs at a flat `--effort low` instead — see *Harness scale selector*). The runner
 reads each layer's parallel width (the number of thunks in a `parallel()`, or items
 in a `pipeline()` stage) and sets effort automatically:
 
-| Parallel agents in the layer | Effort  | Typical role |
-|------------------------------|---------|--------------|
-| **1** (lone)                 | `xhigh` | consolidate / judge / synthesize / report — critical gate |
-| **2+** (any fan-out)         | `high`  | floor — wide fan-outs still think hard |
+| Parallel agents in the layer | Effort | Typical role |
+|------------------------------|--------|--------------|
+| **1** (lone)                 | `max`  | consolidate / judge / synthesize / report — critical gate |
+| **2+** (any fan-out)         | `high` | floor — wide fan-outs still think hard |
 
 So in a forge-style run, the `consolidate`, `portfolio-judge`, and `report-writer`
-agents automatically get `xhigh`; every fan-out — the 3–4-wide pain/mechanism/
+agents automatically get `max`; every fan-out — the 3–4-wide pain/mechanism/
 recombination waves *and* the 12-persona / 8-critic layers alike — gets `high`.
-The floor is `high`; the policy never drops to `medium`. No per-agent bookkeeping.
+The floor is `high`; the policy never drops to `low`. No per-agent bookkeeping.
 
 Precedence (highest first): **`--pin-effort E`** (force every agent to `E`) →
 a script's **per-call `effort`** → **`--auto-effort`** layer policy → flat
-**`--effort E`** → unset (no effort hint sent). On Kimi, effort is conveyed as
-a **prompt annotation** — the runner prepends `(thinking effort: E)` to the
-agent's prompt; there is no Kimi CLI/config reasoning-effort control, so treat
-the tiers as guidance the model follows, not a mechanical dial. Because per-call
-effort overrides the policy, **do not hand-set `effort` in scripts** — leave it out and let
-`--auto-effort` govern; reserve a per-call `effort` for a rare, deliberate
-exception (e.g. forcing `xhigh` on one unusually hard agent *inside* a wide
-layer).
+**`--effort E`** → unset (no effort hint sent, so the model uses its default —
+`max` for K3). On Kimi, effort is conveyed as a **prompt annotation** — the runner
+prepends `(reasoning effort: E)` to the agent's prompt; the Kimi CLI has no headless
+reasoning-effort flag, so treat the tiers as guidance the model follows, not a
+mechanical dial. (The managed kimi-code endpoint may also pin K3 to `max` regardless
+— its provider advertises `supportEfforts:["max"]` — so a sub-`max` hint there is
+best-effort.) Because per-call effort overrides the policy, **do not hand-set
+`effort` in scripts** — leave it out and let `--auto-effort` govern; reserve a
+per-call `effort` for a rare, deliberate exception (e.g. forcing `max` on one
+unusually hard agent *inside* a wide layer).
 
 Bound cost without touching the model: keep `--auto-effort` but add a `--budget`
-backstop, or drop everything a tier with `--pin-effort medium`. For a small
-`quick_harness`, flat **`--effort medium`** is the right default (cheaper, uniform);
+backstop, or drop everything a tier with `--pin-effort low`. For a small
+`quick_harness`, flat **`--effort low`** is the right default (cheaper, uniform);
 the layer-aware policy matters most for multi-phase standard/deep runs.
 
 ## Authoring (quick reference)
@@ -715,8 +719,8 @@ run-workflow <script.js>
   --pin-model M    pin ALL agents to model M — validated against the configured
                    set, fails fast if unusable (overrides per-call model)
   --model M        fallback model when not pinned; Claude ids/aliases auto-map
-  --effort E       none|minimal|low|medium|high|xhigh; flat fallback; unset → no effort hint sent
-  --auto-effort    scale effort to layer width: 1→xhigh, 2+→high (floor) (recommended; overrides --effort)
+  --effort E       low|high|max (default max); flat fallback; unset → no effort hint sent
+  --auto-effort    scale effort to layer width: 1→max, 2+→high (floor) (recommended; overrides --effort)
   --pin-effort E   force ALL agents to effort E (overrides per-call effort)
   --sandbox S      read-only → ENFORCED best-effort (worktree-isolated cwds +
                    hard preamble; refused fast outside a git repo);
@@ -776,9 +780,9 @@ Unknown flags are rejected with an error (exit 1) — the runner never guesses.
   Tripping it isn't fatal — the CLI prints a ready-to-paste `--resume` command
   with a higher ceiling, and the cached agents replay at 0 tokens.
 - **Effort (important)** — prefer **`--auto-effort`**, which sets each agent's
-  effort from its layer's parallel width (1→`xhigh`, 2+→`high`; the floor is
+  effort from its layer's parallel width (1→`max`, 2+→`high`; the floor is
   `high`; see *Effort*). On Kimi, effort is a **prompt annotation**: the runner
-  prepends `(thinking effort: E)` to the agent's prompt when an effort is set,
+  prepends `(reasoning effort: E)` to the agent's prompt when an effort is set,
   and sends nothing when it isn't — there is no user-config or model-catalog
   default to inherit, and no mechanical reasoning-effort control. It's guidance
   the model follows, not a hard dial, so the `--plan` per-effort token

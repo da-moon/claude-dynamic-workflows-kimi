@@ -71,7 +71,7 @@ function skel(s) {
 
 // Layer-width context. parallel()/pipeline() publish how many agents run
 // side-by-side in the current layer; agent() reads it (default 1 for a lone,
-// un-fanned-out call) to scale thinking effort. AsyncLocalStorage propagates
+// un-fanned-out call) to scale reasoning effort. AsyncLocalStorage propagates
 // across awaits and through the vm-hosted thunks, so a queued or deeply-awaited
 // agent still sees the width of the layer that spawned it.
 const layerCtx = new AsyncLocalStorage();
@@ -79,14 +79,15 @@ function currentLayerWidth() {
   return layerCtx.getStore()?.width ?? 1;
 }
 
-// Thinking effort scales INVERSELY with layer width: a lone agent is a critical
+// Reasoning effort scales INVERSELY with layer width: a lone agent is a critical
 // gate (consolidation / judge / report) and earns the highest auto-policy tier.
-// Every fan-out floors at `high` — we never drop to `medium`, even on wide layers.
-// One knob, one place.
-//   width 1   -> xhigh   (sole agent in its layer: critical gate)
-//   width >= 2 -> high    (any fan-out: floor)
+// Every fan-out floors at `high` — we never drop to `low`, even on wide layers.
+// Kimi's reasoning-effort ladder is low | high | max (default max). One knob,
+// one place.
+//   width 1   -> max    (sole agent in its layer: critical gate)
+//   width >= 2 -> high   (any fan-out: floor)
 export function effortForLayerWidth(width) {
-  if (width <= 1) return "xhigh";
+  if (width <= 1) return "max";
   return "high";
 }
 
@@ -167,7 +168,7 @@ export function createRuntime({
       throw err;
     }
   }
-  // Thinking-effort policy in ONE place (used by agent() and sessions). Precedence
+  // Reasoning-effort policy in ONE place (used by agent() and sessions). Precedence
   // (highest first): --pin-effort > per-call effort > --auto-effort (layer width) >
   // --effort flag > Kimi config default (effort omitted). Returns { effort, src }.
   function resolveEffort(callOpts, width) {
@@ -188,10 +189,10 @@ export function createRuntime({
     // else the last phase() title. Persisted to the journal for the viewer.
     const effectivePhase = opts.phase ?? currentPhase ?? null;
 
-    // Resolve thinking effort. Precedence (highest first):
+    // Resolve reasoning effort. Precedence (highest first):
     //   pinnedEffort (--pin-effort)        authoritative, like --pin-model
     //   per-call opts.effort               the author's deliberate choice
-    //   layer-width policy (--auto-effort)  1->xhigh, >=2->high (floor)
+    //   layer-width policy (--auto-effort)  1->max, >=2->high (floor)
     //   defaults.effort (--effort)         flat fallback
     //   undefined                          Kimi config default (effort omitted)
     // The effective effort is written back onto `merged`, so it both reaches the

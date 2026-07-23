@@ -13,7 +13,7 @@
 //
 // Patterns: fresh-context review gate (producer != reviewer != synthesizer) +
 // perspective-diverse, refute-by-default review. Under --auto-effort the lone
-// producer and decision gates think hardest (xhigh); the review fan-out gets the
+// producer and decision gates think hardest (max); the review fan-out gets the
 // floor (high). Works for any artifact: a plan, a design, a spec, a migration.
 
 export const meta = {
@@ -85,7 +85,7 @@ const LENSES = [
   { key: "tests-and-risk", brief: "How would this be tested? What's the riskiest step, and the rollback?" },
 ];
 
-// ── Produce: one agent drafts the artifact (lone gate → xhigh under --auto-effort)
+// ── Produce: one agent drafts the artifact (lone gate → max under --auto-effort)
 phase("Produce");
 const draft = await agent(
   `Task: ${TASK}\n\nProduce a concrete, self-contained ${KIND}. Make your key decisions explicit ` +

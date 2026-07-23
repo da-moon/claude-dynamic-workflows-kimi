@@ -82,7 +82,7 @@ node runner/bin/run-workflow.js examples/harness-zoo/goal-lint/goal-lint.workflo
 
 GoalLint is an 11-agent **standard** harness, so it runs with **`--auto-effort`**:
 its 7 parallel critics get `high`, while the lone gates — Parse, Rewrite, the
-fresh-context Verify, and Report — get `xhigh`, since a weak output at any of those
+fresh-context Verify, and Report — get `max`, since a weak output at any of those
 single-agent gates would sink the whole lint.
 
 A **bare string** goal works too:

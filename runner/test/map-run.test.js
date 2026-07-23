@@ -27,7 +27,7 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
       { label: "audit:hero", order: 0, phase: "Audit", model: "gpt-5.5", effort: "high", tokens: 300000, ms: 4200, result: { verdict: "ok" } },
       { label: "audit:cta", order: 1, phase: "Audit", model: "gpt-5.5", effort: "high", tokens: 370000, ms: 5700, result: {} },
       ...concept,
-      { label: "synthesize:final", order: 99, phase: "Synthesize", model: "gpt-5.5", effort: "xhigh", tokens: 1200000, ms: 22000, result: { recommended_direction: "Persona-3 bold" } },
+      { label: "synthesize:final", order: 99, phase: "Synthesize", model: "gpt-5.5", effort: "max", tokens: 1200000, ms: 22000, result: { recommended_direction: "Persona-3 bold" } },
     ],
     models: { "gpt-5.5": 17 },
     totals: { tokens: 8000000, ms: 140000, hasMetrics: true },
@@ -45,7 +45,7 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
   assert.match(s, /barrier · Audit → Concept/, "semantic barrier names the phases");
   assert.match(s, /\+3 more/, "14 agents collapse to +3 more at maxAgents 12");
   assert.match(s, /1\.2M\b/, "per-agent token cell (1.2M, no unit suffix in the grid)");
-  assert.match(s, /xhigh/, "effort shown on the lone synthesizer");
+  assert.match(s, /max/, "effort shown on the lone synthesizer");
   assert.match(s, /✦ result/, "result node present");
 }
 
@@ -83,7 +83,7 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
   const jf = join(jdir, "r.workflow.jsonl");
   await writeFile(jf, [
     JSON.stringify({ key: "a#0", label: "scan:x", result: { findings: [] }, phase: "Scan", model: "gpt-5.5", effort: "high", tokens: 400000, ms: 5000 }),
-    JSON.stringify({ key: "b#0", label: "report", result: { recommended_direction: "ship it" }, phase: "Report", model: "gpt-5.5", effort: "xhigh", tokens: 900000, ms: 12000 }),
+    JSON.stringify({ key: "b#0", label: "report", result: { recommended_direction: "ship it" }, phase: "Report", model: "gpt-5.5", effort: "max", tokens: 900000, ms: 12000 }),
   ].join("\n"));
   const run = buildRunModel({ journalPath: jf, runDir: dir });
   const s = plain(renderMap(run, { color: false, width: 80 }));
@@ -136,7 +136,7 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
 // including a reportMarkdown shape (which the old "final agent" heuristic missed).
 {
   const base = { name: "r", description: "", phases: [{ title: "Synthesize" }],
-    agents: [{ label: "synthesize", order: 0, phase: "Synthesize", model: "gpt-5.5", effort: "xhigh", tokens: 46000, ms: 130000, result: { reportMarkdown: "# Brief" } }],
+    agents: [{ label: "synthesize", order: 0, phase: "Synthesize", model: "gpt-5.5", effort: "max", tokens: 46000, ms: 130000, result: { reportMarkdown: "# Brief" } }],
     models: { "gpt-5.5": 1 }, totals: { tokens: 46000, ms: 130000, hasMetrics: true }, counts: { phases: 1, agents: 1 }, sources: {} };
   // report-shaped result → first prose line of the markdown
   const md = plain(renderMap({ ...base, result: { reportMarkdown: "# Title\n\nThe top recommendation is to ship the MVP first." } }, { color: false, width: 80 }));
@@ -157,7 +157,7 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
   const jf = join(jdir, "review.workflow.jsonl");
   await writeFile(jf, [
     JSON.stringify({ key: "a#0", label: "review:new-to-nix", result: { summary: "Prereqs missing." }, phase: "Review", model: "kimi-code", effort: "high", tokens: 40000, ms: 60000 }),
-    JSON.stringify({ key: "m#0", label: "merge", result: { summary: "Merged 4 reviews." }, phase: "Merge", model: "kimi-code", effort: "medium", tokens: 5000, ms: 30000 }),
+    JSON.stringify({ key: "m#0", label: "merge", result: { summary: "Merged 4 reviews." }, phase: "Merge", model: "kimi-code", effort: "high", tokens: 5000, ms: 30000 }),
   ].join("\n"));
   await writeFile(join(jdir, "review.workflow.result.json"),
     JSON.stringify({ merged: { verdict: "ship-with-nits", summary: "README is accurate but assumes Nix fluency.", defects: [] } }));
@@ -193,7 +193,7 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
     { t: 100, type: "start", label: "scan:a", phase: "Scan", model: "gpt-5.5", effort: "high" },
     { t: 150, type: "start", label: "scan:b", phase: "Scan", model: "gpt-5.5", effort: "high" },
     { t: 400, type: "end", label: "scan:a", phase: "Scan", tokens: 1000, ms: 300 },
-    { t: 420, type: "start", label: "report", phase: "Report", model: "gpt-5.5", effort: "xhigh" },
+    { t: 420, type: "start", label: "report", phase: "Report", model: "gpt-5.5", effort: "max" },
   ];
   const ls = liveState(events);
   assert.deepEqual(ls.running.map((r) => r.label).sort(), ["report", "scan:b"], "b + report running; a done");
@@ -231,7 +231,7 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
   await writeFile(join(jdir, "r.workflow.events.jsonl"), [
     JSON.stringify({ t: 100, type: "start", label: "rank:bucket-1", phase: "Rank", model: "gpt-5.5", effort: "high" }),
     JSON.stringify({ t: 37100, type: "end", label: "rank:bucket-1", phase: "Rank", tokens: 22000, ms: 37000 }),
-    JSON.stringify({ t: 37200, type: "start", label: "merge:final", phase: "Merge", model: "gpt-5.5", effort: "xhigh" }),
+    JSON.stringify({ t: 37200, type: "start", label: "merge:final", phase: "Merge", model: "gpt-5.5", effort: "max" }),
   ].join("\n"));
 
   const loc = locateRun({ target: dir });
@@ -276,7 +276,7 @@ const plain = (s) => s.replace(/\x1b\[[0-9;]*m/g, ""); // strip ANSI for asserti
     JSON.stringify({ key: "sess:s1#0", label: "oracle", result: { summary: "Repo ingested; 14 modules mapped." }, phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 52000, ms: 86000, session: true, sessionId: "s1", turn: 0, status: "completed", threadId: "th-1" }),
     JSON.stringify({ key: "sess:s1#1", label: "oracle", result: { summary: "Auth flows traced." }, phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 30000, ms: 40000, session: true, sessionId: "s1", turn: 1, status: "completed", threadId: "th-1" }),
     JSON.stringify({ key: "sess:s2#0", label: "rival", result: null, phase: "Explore", model: "gpt-5.5", effort: "high", tokens: 12000, ms: 20000, session: true, sessionId: "s2", turn: 0, status: "cancelled", threadId: "th-2" }),
-    JSON.stringify({ key: "j#0", label: "judge:final", result: { one_line_verdict: "Oracle wins." }, phase: "Judge", model: "gpt-5.5", effort: "xhigh", tokens: 90000, ms: 60000 }),
+    JSON.stringify({ key: "j#0", label: "judge:final", result: { one_line_verdict: "Oracle wins." }, phase: "Judge", model: "gpt-5.5", effort: "max", tokens: 90000, ms: 60000 }),
   ].join("\n"));
   const run = buildRunModel({ journalPath: jf, runDir: dir });
   assert.equal(run.sessions.length, 2, "two workers grouped from turn agents");
